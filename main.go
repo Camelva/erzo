@@ -1,9 +1,12 @@
 package main
 
 import (
+	"bufio"
+	"encoding/json"
 	"erzo/parsers"
 	"fmt"
 	"net/url"
+	"os"
 	"regexp"
 )
 
@@ -14,35 +17,38 @@ const (
 )
 
 func main() {
-	r, err := Get("some text with url " +
-		"https://soundcloud.com/bonsaicollct/colson-xl-torrid " +
-		"and more text")
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Print("Enter link: ")
+	userInput, _ := reader.ReadString('\n')
+	r, err := Get(userInput)
 	if err != nil {
 		fmt.Printf("err: %s", err)
 	}
-	fmt.Printf("Response: %s", r)
+	_ = r
+	//fmt.Printf("Response: %s", r)
 }
 
-func Get(message string) (res string, err error) {
+func Get(message string) (string, error) {
 	urlObj, err := extractURL(message)
 	if err != nil {
 		return "", err
 	}
 
-	// TODO: improve this
-	isSC, err := regexp.MatchString(`(?:(?:www\.)|(?:m\.)(?:w\.))?soundcloud\.com`, urlObj.Hostname())
+	info, err := parsers.Parse(urlObj)
 	if err != nil {
 		return "", err
 	}
-	if isSC {
-		dlURL, err := soundcloud.Get(urlObj)
-		if err != nil {
-			return "", err
-		}
-		res = dlURL
+
+	//fmt.Printf("%+v", info)
+	if err := PrettyPrint(info); err != nil {
+		return "", err
 	}
 
-	return urlObj.String(), nil
+	for _, format := range info.Formats {
+		fmt.Println(format["url"])
+	}
+
+	return "s", nil
 }
 
 func extractURL(message string) (*url.URL, error) {
@@ -53,4 +59,12 @@ func extractURL(message string) (*url.URL, error) {
 		return nil, err
 	}
 	return link, nil
+}
+
+func PrettyPrint(v interface{}) (err error) {
+	b, err := json.MarshalIndent(v, "", "  ")
+	if err == nil {
+		fmt.Println(string(b))
+	}
+	return
 }
