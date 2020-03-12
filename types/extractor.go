@@ -19,8 +19,11 @@ type ExtractorInfo struct {
 	CommentCount int
 	RepostCount int
 	Genre string
-	Formats []map[string]string
+	Formats Formats
 }
+
+type Formats []Format
+type Format map[string]string
 
 type Artwork struct{
 	Type string

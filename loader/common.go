@@ -1,26 +1,17 @@
-package parsers
+package loader
 
 import (
 	"erzo/types"
 	"io/ioutil"
 	"net/http"
 	"net/url"
-	"regexp"
 )
 
-func Parse(u *url.URL) (*types.ExtractorInfo, error) {
-	if ok, _ := regexp.MatchString(SoundCloudPattern, u.Hostname()); ok {
-		sc := new(SoundCloud)
-		res, err := sc.Get(u)
-		if err != nil {
-			return nil, err
-		}
-		return res, nil
+func commonLoader(f types.Format) ([]byte, error) {
+	u, err := url.Parse(f["url"])
+	if err != nil {
+		return nil, err
 	}
-	return nil, nil
-}
-
-func fetchURL(u *url.URL) ([]byte, error) {
 	var userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:73.0) Gecko/20100101 Firefox/73.0"
 
 	req, err := http.NewRequest(http.MethodGet, u.String(), nil)

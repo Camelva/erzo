@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"encoding/json"
+	"erzo/loader"
 	"erzo/parsers"
 	"fmt"
 	"net/url"
@@ -24,8 +25,8 @@ func main() {
 	if err != nil {
 		fmt.Printf("err: %s", err)
 	}
-	_ = r
-	//fmt.Printf("Response: %s", r)
+	//_ = r
+	fmt.Printf("Response: %s", r)
 }
 
 func Get(message string) (string, error) {
@@ -47,8 +48,10 @@ func Get(message string) (string, error) {
 	for _, format := range info.Formats {
 		fmt.Println(format["url"])
 	}
+	
+	res := loader.Go(info.Formats)
 
-	return "s", nil
+	return res, nil
 }
 
 func extractURL(message string) (*url.URL, error) {

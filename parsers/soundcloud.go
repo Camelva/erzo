@@ -166,7 +166,7 @@ func (sc *SoundCloud) buildLink() {
 
 func (sc *SoundCloud) extractInfo(info *types.SoundCloudMetadata2) (*types.ExtractorInfo, error) {
 	trackID := info.ID
-	formats := make([]map[string]string, 0)
+	formats := make(types.Formats, 0)
 	//baseURL := fmt.Sprintf("%stracks/%d", sc.Host, trackID)
 	//query := url.Values{"client_id" : {sc.ClientID}}
 	if info.Downloadable && info.HasDownloadsLeft {
@@ -221,8 +221,8 @@ func (sc *SoundCloud) extractInfo(info *types.SoundCloudMetadata2) (*types.Extra
 	return ExtractedInfo, nil
 }
 
-func (sc *SoundCloud) extractFormats(transcodings []types.SoundCloudTranscoding) ([]map[string]string, error) {
-	formats := make([]map[string]string, 0)
+func (sc *SoundCloud) extractFormats(transcodings []types.SoundCloudTranscoding) (types.Formats, error) {
+	formats := make(types.Formats, 0)
 	for _, t := range transcodings {
 		formatURL, err := url.Parse(t.URL)
 		if err != nil { return nil, err }
@@ -243,7 +243,7 @@ func (sc *SoundCloud) extractFormats(transcodings []types.SoundCloudTranscoding)
 	return formats, nil
 }
 
-func (sc *SoundCloud) addFormat(formats *[]map[string]string, t types.SoundCloudTranscoding) {
+func (sc *SoundCloud) addFormat(formats *types.Formats, t types.SoundCloudTranscoding) {
 	re := regexp.MustCompile(`_`)
 	ext := re.Split(t.Preset, -1)[0]
 	re = regexp.MustCompile(`audio/([\w-]+)[;]?`)
@@ -257,8 +257,8 @@ func (sc *SoundCloud) addFormat(formats *[]map[string]string, t types.SoundCloud
 	*formats = append(*formats, f)
 }
 
-func (sc *SoundCloud) sortFormats(formats *[]map[string]string) {
-	formatsCopy := make([]map[string]string, 3)
+func (sc *SoundCloud) sortFormats(formats *types.Formats) {
+	formatsCopy := make(types.Formats, 3)
 	copy(formatsCopy, *formats)
 	for i, format := range formatsCopy {
 		var score int
