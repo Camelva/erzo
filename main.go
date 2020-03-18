@@ -49,9 +49,12 @@ func Get(message string) (string, error) {
 		fmt.Println(format["url"])
 	}
 	
-	res := loader.Go(info.Formats)
+	fileName, err := loader.Go(info.Formats)
+	if err != nil {
+		return "", err
+	}
 
-	return res, nil
+	return fileName, nil
 }
 
 func extractURL(message string) (*url.URL, error) {
