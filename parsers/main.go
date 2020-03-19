@@ -1,45 +1,34 @@
 package parsers
 
 import (
+	"erzo/parsers/soundcloud"
 	"erzo/types"
-	"io/ioutil"
-	"net/http"
+	"fmt"
 	"net/url"
-	"regexp"
 )
 
-func Parse(u *url.URL) (*types.ExtractorInfo, error) {
-	if ok, _ := regexp.MatchString(SoundCloudPattern, u.Hostname()); ok {
-		sc := new(SoundCloud)
-		res, err := sc.Get(u)
+type Extractor interface {
+	Extract(url.URL) (*types.ExtractorInfo, error)
+	Compatible(string) bool
+}
+
+var extractors []Extractor
+
+func init() {
+	soundcloudIE := soundcloud.Init()
+	extractors = append(extractors, soundcloudIE)
+}
+
+func Parse(u url.URL) (*types.ExtractorInfo, error) {
+	for _, extractor := range extractors {
+		if !extractor.Compatible(u.Hostname()) {
+			continue
+		}
+		res, err := extractor.Extract(u)
 		if err != nil {
 			return nil, err
 		}
 		return res, nil
 	}
-	return nil, nil
-}
-
-func fetchURL(u *url.URL) ([]byte, error) {
-	var userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:73.0) Gecko/20100101 Firefox/73.0"
-
-	req, err := http.NewRequest(http.MethodGet, u.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("User-Agent", userAgent)
-
-	client := new(http.Client)
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	return body, nil
+	return nil, fmt.Errorf("there is no compatible extractor")
 }

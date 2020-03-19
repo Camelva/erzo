@@ -35,7 +35,7 @@ func Get(message string) (string, error) {
 		return "", err
 	}
 
-	info, err := parsers.Parse(urlObj)
+	info, err := parsers.Parse(*urlObj)
 	if err != nil {
 		return "", err
 	}
@@ -48,7 +48,7 @@ func Get(message string) (string, error) {
 	for _, format := range info.Formats {
 		fmt.Println(format["url"])
 	}
-	
+
 	fileName, err := loader.Go(info.Formats)
 	if err != nil {
 		return "", err
