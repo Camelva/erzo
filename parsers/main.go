@@ -2,22 +2,19 @@ package parsers
 
 import (
 	"erzo/parsers/soundcloud"
+	"erzo/parsers/youtube"
 	"erzo/types"
 	"fmt"
 	"net/url"
 )
 
-type Extractor interface {
-	Extract(url.URL) (*types.ExtractorInfo, error)
-	Compatible(string) bool
-}
-
-var extractors []Extractor
-
 func init() {
-	soundcloudIE := soundcloud.Init()
-	extractors = append(extractors, soundcloudIE)
+	soundcloudIE := soundcloud.IE
+	youtubeIE := youtube.IE
+	extractors = append(extractors, soundcloudIE, youtubeIE)
 }
+
+var extractors []types.Extractor
 
 func Parse(u url.URL) (*types.ExtractorInfo, error) {
 	for _, extractor := range extractors {

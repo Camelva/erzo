@@ -16,8 +16,8 @@ func init() {
 		log.Println(err)
 	}
 	config = types.Loader{
-		Name: "ffmpeg",
-		Bin: bin,
+		Name:    "ffmpeg",
+		Bin:     bin,
 		Formats: []string{"http"},
 	}
 }
@@ -57,7 +57,7 @@ func GetConfig() *types.Loader {
 	return &config
 }
 
-func Get(u *url.URL)(string, error) {
+func Get(u *url.URL) (string, error) {
 	var outName = "song.mp3"
 	_, err := execute(config.Bin, "-i", u.String(), "-c", "copy", outName)
 	if err != nil {

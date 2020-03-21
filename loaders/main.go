@@ -1,11 +1,12 @@
-package loader
+package loaders
 
 import (
-	"erzo/loader/ffmpeg"
-	"erzo/types"
 	"fmt"
 	"log"
 	"net/url"
+
+	"erzo/loaders/ffmpeg"
+	"erzo/types"
 )
 
 var loaders []types.Loader
@@ -14,6 +15,7 @@ func init() {
 	ffmpegConf := ffmpeg.GetConfig()
 	if ffmpegConf == nil {
 		log.Fatalln("FFmpeg is required for work.")
+		return
 	}
 	ffmpegConf.Available = true
 	loaders = append(loaders, *ffmpegConf)
@@ -35,7 +37,7 @@ func Go(formats types.Formats) (string, error) {
 
 func process(f types.Format) (string, error) {
 	// TODO: add multiple parsers support
-	u, err := url.Parse(f["url"])
+	u, err := url.Parse(f.Url)
 	if err != nil {
 		return "", err
 	}

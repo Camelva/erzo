@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -22,10 +21,6 @@ func Fetch(u *url.URL) ([]byte, error) {
 		return nil, err
 	}
 	defer resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf(resp.Status)
-	}
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {

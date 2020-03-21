@@ -2,55 +2,69 @@ package soundcloud
 
 import (
 	"encoding/json"
-	"erzo/types"
-	"erzo/utils"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/url"
 	"regexp"
-	"sort"
-	"strconv"
+
+	"erzo/types"
+	"erzo/utils"
 )
 
-type SoundCloudIE struct {
-	urlPattern string
-	apiURL     string
-	api2URL    string
-	baseURL    string
-	clientID   string
-}
-
-type kind int8
-
+// const for identifying user-provided url's type (kind)
 const (
-	songType kind = iota
-	playlistType
-	stationType
-	userType
+	_song urlKind = iota
+	_playlist
+	_station
+	_user
 )
 
-type scURL struct {
-	title  string
-	user   string
-	kind   kind
-	secret string
-	url    string
+func (k urlKind) String() string {
+	switch k {
+	case 0:
+		return "song"
+	case 1:
+		return "playlist"
+	case 2:
+		return "station"
+	case 3:
+		return "user"
+	default:
+		return "undefined"
+	}
 }
 
-var extractor = SoundCloudIE{
-	urlPattern: `(?:(?:www\.)|(?:m\.)(?:w\.))?soundcloud\.com`,
-	apiURL:     "https://api.soundcloud.com/",
-	api2URL:    "https://api-v2.soundcloud.com/",
-	baseURL:    "https://soundcloud.com/",
-	clientID:   "psT32GLDMZ0TQKgfPkzrGIlco3PYA1kf",
+const tokenFile = "parsers/soundcloud/token.txt"
+
+func init() {
+	//noinspection SpellCheckingInspection
+	clientIDBase := "psT32GLDMZ0TQKgfPkzrGIlco3PYA1kf"
+
+	IE = extractor{
+		urlPattern: `(?:(?:www\.)|(?:m\.)(?:w\.))?soundcloud\.com`,
+		apiURL:     "https://api.soundcloud.com/",
+		api2URL:    "https://api-v2.soundcloud.com/",
+		baseURL:    "https://soundcloud.com/",
+		clientID:   clientIDBase,
+	}
+
+	tokenBytes, err := ioutil.ReadFile(tokenFile)
+	if err != nil {
+		log.Printf("reading token file: %s\n", err)
+		return
+	}
+	tokenStr := string(tokenBytes)
+	if len(tokenStr) == 32 {
+		IE.clientID = tokenStr
+	}
+	return
 }
 
-func Init() SoundCloudIE {
-	return extractor
-}
+var IE extractor
 
-func (ie SoundCloudIE) Compatible(s string) bool {
-	ok, err := regexp.MatchString(extractor.urlPattern, s)
+func (ie extractor) Compatible(s string) bool {
+	ok, err := regexp.MatchString(IE.urlPattern, s)
 	if err != nil {
 		log.Printf("[soundcloud] error while comparing: %s", err)
 		return false
@@ -58,11 +72,11 @@ func (ie SoundCloudIE) Compatible(s string) bool {
 	return ok
 }
 
-func (ie SoundCloudIE) Extract(u url.URL) (*types.ExtractorInfo, error) {
+func (ie extractor) Extract(u url.URL) (*types.ExtractorInfo, error) {
 	sc := parseURL(u)
-	if sc.kind != songType {
-		err := fmt.Errorf("[soundcloud] playlists not supported yet")
-		log.Print(err)
+	if sc.kind != _song {
+		err := types.ErrNotSupported{Subject: sc.kind.String()}
+		log.Printf("[soundcloud] %s\n", err)
 		return nil, err
 	}
 	metadata, err := resolve(sc.url)
@@ -71,7 +85,7 @@ func (ie SoundCloudIE) Extract(u url.URL) (*types.ExtractorInfo, error) {
 	}
 	info, err := extractInfo(metadata)
 	if err != nil {
-		log.Printf("[soundcloud] error while extracting info: %s", err)
+		log.Printf("[soundcloud] extracting info: %s\n", err)
 		return nil, err
 	}
 	return info, nil
@@ -79,160 +93,87 @@ func (ie SoundCloudIE) Extract(u url.URL) (*types.ExtractorInfo, error) {
 
 func parseURL(u url.URL) *scURL {
 	path := u.EscapedPath()
-	if sc := parseStation(path); sc != nil {
-		return sc
+	stationTmpl := `^/(?:stations)/(?:track)/([\w-]+)/([\w-]+)(?:|/|/([\w-]+)/?)$`
+	stationRE := regexp.MustCompile(stationTmpl)
+	playlistTmpl := `^/([\w-]+)/(?:sets)/([\w-]+)(?:|/|/([\w-]+)/?)$`
+	playlistRE := regexp.MustCompile(playlistTmpl)
+	userTmpl := `^/([\w-]+)/?$`
+	userRE := regexp.MustCompile(userTmpl)
+	songTmpl := `^/([\w-]+)/([\w-]+)(?:|/|/([\w-]+)/?)$`
+	songRE := regexp.MustCompile(songTmpl)
+	kinds := []*regexp.Regexp{_station: stationRE, _playlist: playlistRE, _user: userRE, _song: songRE}
+	for t, k := range kinds {
+		result := k.FindStringSubmatch(path)
+		if result == nil {
+			continue
+		}
+		var user, title, secret, uri string
+		if len(result) > 1 {
+			user = result[1]
+		}
+		if len(result) > 2 {
+			title = result[2]
+		}
+		if len(result) > 3 {
+			secret = result[3]
+		}
+
+		switch urlKind(t) {
+		case _station:
+			log.Println("station")
+			uri = fmt.Sprintf("%sstations/track/%s/%s", IE.baseURL, user, title)
+		case _playlist:
+			log.Println("playlist")
+			uri = fmt.Sprintf("%ssets/%s/%s", IE.baseURL, user, title)
+		case _user:
+			log.Println("user")
+			uri = fmt.Sprintf("%s%s", IE.baseURL, user)
+		case _song:
+			if user == "stations" {
+				continue
+			}
+			if title == "sets" {
+				continue
+			}
+			log.Println("song")
+			uri = fmt.Sprintf("%s%s/%s", IE.baseURL, user, title)
+		}
+		sc := scURL{
+			title:  title,
+			user:   user,
+			kind:   urlKind(t),
+			secret: secret,
+			url:    uri,
+		}
+		return &sc
 	}
-	if sc := parsePlaylist(path); sc != nil {
-		return sc
-	}
-	if sc := parseSong(path); sc != nil {
-		return sc
-	}
-	// TODO: parse User link
-	_ = userType
-	return nil
+	return &scURL{}
 }
 
-func parseStation(path string) *scURL {
-	pattern := `^[\/](?:stations)[\/]` + // /stations/
-		`(?:track)[\/]` + // track/
-		`([\w-]+)[\/]` + // user/
-		`([\w-]+)[\/]?$` // title/
-	re := regexp.MustCompile(pattern)
-	result := re.FindStringSubmatch(path)
-	if len(result) < 1 {
-		return nil
-	}
-	var (
-		user   = result[1]
-		title  = result[2]
-		secret = result[3]
-		uri    = fmt.Sprintf("%sstations/track/%s/%s", extractor.baseURL, user, title)
-	)
-	if len(secret) > 0 {
-		uri += fmt.Sprintf("/%s", secret)
-	}
-	sc := scURL{
-		title:  title,
-		user:   user,
-		kind:   stationType,
-		secret: secret,
-		url:    uri,
-	}
-	return &sc
-}
-
-func parsePlaylist(path string) *scURL {
-	pattern := `^[\/]([\w-]+)[\/]` +
-		`(?:sets)` +
-		`[\/]([\w-]+)[\/]?` +
-		`([\w-]+)?[\/]?$`
-	re := regexp.MustCompile(pattern)
-	result := re.FindStringSubmatch(path)
-	if len(result) < 1 {
-		return nil
-	}
-	var (
-		user   = result[1]
-		title  = result[2]
-		secret = result[3]
-		uri    = fmt.Sprintf("%ssets/%s/%s", extractor.baseURL, user, title)
-	)
-	if len(secret) > 0 {
-		uri += fmt.Sprintf("/%s", secret)
-	}
-	sc := scURL{
-		title:  title,
-		user:   user,
-		kind:   playlistType,
-		secret: secret,
-		url:    uri,
-	}
-	return &sc
-}
-
-func parseSong(path string) *scURL {
-	pattern := `^[\/]([\w-]+)[\/]` +
-		`([\w-]+)[\/]?` +
-		`([\w-]+)?[\/]?$`
-	re := regexp.MustCompile(pattern)
-	result := re.FindStringSubmatch(path)
-	if len(result) < 1 {
-		return nil
-	}
-	var (
-		user   = result[1]
-		title  = result[2]
-		secret = result[3]
-		uri    = fmt.Sprintf("%s%s/%s", extractor.baseURL, user, title)
-	)
-	if len(secret) > 0 {
-		uri += fmt.Sprintf("/%s", secret)
-	}
-	sc := scURL{
-		title:  title,
-		user:   user,
-		kind:   songType,
-		secret: secret,
-		url:    uri,
-	}
-	return &sc
-}
-
-func resolve(link string) (*types.SoundCloudMetadata2, error) {
-	resolveURL, err := url.Parse(fmt.Sprintf("%sresolve?url=%s", extractor.api2URL, link))
+func resolve(link string) (*metadata2, error) {
+	resolveURL, err := url.Parse(fmt.Sprintf("%sresolve?url=%s", IE.api2URL, link))
 	if err != nil {
-		log.Printf("[soundcloud] error while building resolve link: %s", err)
+		log.Printf("[soundcloud] building resolve link: %s\n", err)
 		return nil, err
 	}
 	res, err := fetch(resolveURL)
 	if err != nil {
 		return nil, err
 	}
-	if len(res) < 1 {
-		log.Printf("%s\n", res)
-		// TODO: update token
-		err := fmt.Errorf("[soundcloud] token outdated")
-		log.Println(err)
-		return nil, err
-	}
-	var scMetadata = new(types.SoundCloudMetadata2)
+	var scMetadata = new(metadata2)
 	if err := json.Unmarshal(res, &scMetadata); err != nil {
-		log.Printf("[soundcloud] error while unmarshaling metadata response: %s", err)
-		log.Printf("%s", res)
+		log.Printf("[soundcloud] unmarshalling metadata response: %s\nResponse: %s\n", err, res)
 		return nil, err
 	}
 	return scMetadata, nil
 }
 
-func extractInfo(info *types.SoundCloudMetadata2) (*types.ExtractorInfo, error) {
-	trackID := info.ID
-	formats := make(types.Formats, 0)
-	//baseURL := fmt.Sprintf("%stracks/%d", sc.Host, trackID)
-	//query := url.Values{"client_id" : {sc.ClientID}}
-	if info.Downloadable && info.HasDownloadsLeft {
-		dlURL, err := url.Parse(info.DownloadURL)
-		if err != nil {
-			return nil, err
-		}
-		q := dlURL.Query()
-		q.Set("client_id", extractor.clientID)
-		query := q.Encode()
-		dlURL.RawQuery = query
-		format := map[string]string{
-			"url":      dlURL.String(),
-			"ext":      "mp3",
-			"type":     "mpeg",
-			"protocol": "http",
-			"score":    "100",
-		}
-		formats = append(formats, format)
-	}
-
-	if len(formats) < 1 {
+func extractInfo(info *metadata2) (*types.ExtractorInfo, error) {
+	formats, ok := info.getDownloadLink()
+	if !ok {
 		var err error
 		transcodings := info.Media.Transcodings
-		formats, err = extractFormats(transcodings)
+		formats, err = transcodings.extractFormats()
 		if err != nil {
 			return nil, err
 		}
@@ -242,11 +183,11 @@ func extractInfo(info *types.SoundCloudMetadata2) (*types.ExtractorInfo, error) 
 
 	thumbnails, err := extractArtworks(info.ArtworkURL, info.User.AvatarURL)
 	if err != nil {
-		thumbnails = make([]types.Artwork, 0)
+		log.Printf("[soundcloud] extracting artworks: %s\n", err)
 	}
 
 	var ExtractedInfo = &types.ExtractorInfo{
-		ID:           trackID,
+		ID:           info.ID,
 		Uploader:     info.User.Username,
 		UploaderID:   info.User.ID,
 		UploaderURL:  info.User.PermalinkURL,
@@ -268,7 +209,30 @@ func extractInfo(info *types.SoundCloudMetadata2) (*types.ExtractorInfo, error) 
 	return ExtractedInfo, nil
 }
 
-func extractFormats(transcodings []types.SoundCloudTranscoding) (types.Formats, error) {
+func (info *metadata2) getDownloadLink() (types.Formats, bool) {
+	if !info.Downloadable || !info.HasDownloadsLeft {
+		return nil, false
+	}
+	dlURL, err := url.Parse(info.DownloadURL)
+	if err != nil {
+		log.Printf("[soundcloud] parsing download url: %s\n", err)
+		return nil, false
+	}
+	q := dlURL.Query()
+	q.Set("client_id", IE.clientID)
+	query := q.Encode()
+	dlURL.RawQuery = query
+	format := types.Format{
+		Url:      dlURL.String(),
+		Ext:      "mp3",
+		Type:     "mpeg",
+		Protocol: "http",
+		Score:    100,
+	}
+	return []types.Format{format}, true
+}
+
+func (transcodings transcodings) extractFormats() (types.Formats, error) {
 	formats := make(types.Formats, 0)
 	for _, t := range transcodings {
 		formatURL, err := url.Parse(t.URL)
@@ -290,51 +254,10 @@ func extractFormats(transcodings []types.SoundCloudTranscoding) (types.Formats, 
 
 		t.URL = streamObj.URL
 
-		addFormat(&formats, t)
+		formats.Add(t)
 	}
-	sortFormats(&formats)
+	formats.Sort()
 	return formats, nil
-}
-
-func addFormat(formats *types.Formats, t types.SoundCloudTranscoding) {
-	re := regexp.MustCompile(`_`)
-	ext := re.Split(t.Preset, -1)[0]
-	re = regexp.MustCompile(`audio/([\w-]+)[;]?`)
-	mimeType := re.FindStringSubmatch(t.Format.MimeType)[1]
-	f := map[string]string{
-		"url":      t.URL,
-		"type":     mimeType,
-		"protocol": t.Format.Protocol,
-		"ext":      ext,
-	}
-	*formats = append(*formats, f)
-}
-
-func sortFormats(formats *types.Formats) {
-	formatsCopy := make(types.Formats, len(*formats))
-	copy(formatsCopy, *formats)
-	for i, format := range formatsCopy {
-		var score int
-		switch format["ext"] {
-		case "mp3":
-			score += 10
-		case "opus":
-			score += 5
-		default:
-			score += 0
-		}
-		switch format["protocol"] {
-		case "progressive":
-			score += 10
-		case "hls":
-			score += 5
-		default:
-			score += 0
-		}
-		formatsCopy[i]["score"] = strconv.Itoa(score)
-	}
-	sort.Slice(formatsCopy, func(i, j int) bool { return formatsCopy[i]["score"] > formatsCopy[j]["score"] })
-	*formats = formatsCopy
 }
 
 func extractArtworks(artwork string, avatar string) ([]types.Artwork, error) {
@@ -358,7 +281,7 @@ func extractArtworks(artwork string, avatar string) ([]types.Artwork, error) {
 
 	re := regexp.MustCompile(`-([0-9a-z]+)\.jpg`)
 	if !re.MatchString(artwork) {
-		return nil, fmt.Errorf("there is no artworks")
+		return artworks, fmt.Errorf("there is no artworks")
 	}
 
 	for artType, artSize := range artworksMap {
@@ -376,15 +299,60 @@ func extractArtworks(artwork string, avatar string) ([]types.Artwork, error) {
 }
 
 func fetch(u *url.URL) ([]byte, error) {
-	q := u.Query()
-	if cID := q.Get("client_id"); cID == "" {
-		q.Set("client_id", extractor.clientID)
+	// loop for two tries
+	for range []int{0, 0} {
+		q := u.Query()
+		q.Set("client_id", IE.clientID)
 		u.RawQuery = q.Encode()
+		res, err := utils.Fetch(u)
+		if err != nil {
+			log.Printf("[soundcloud] fetching url: %s\n", err)
+			return nil, err
+		}
+		if len(res) < 1 {
+			if err := updateToken(); err != nil {
+				return nil, err
+			}
+			continue
+		}
+		return res, nil
 	}
+	return nil, fmt.Errorf("can't fetch url")
+}
+
+func updateToken() error {
+	u, _ := url.Parse("https://soundcloud.com")
 	res, err := utils.Fetch(u)
 	if err != nil {
-		log.Printf("[soundcloud] error while fetching url: %s", err)
-		return nil, err
+		log.Printf("[soundcloud] fetching homepage: %s\n", err)
+		return err
 	}
-	return res, nil
+	scriptTmpl := `<script[^>]+src="([^"]+)"`
+	clientTmpl := `client_id\s*:\s*"([0-9a-zA-Z]{32})"`
+	scriptRE := regexp.MustCompile(scriptTmpl)
+	clientRE := regexp.MustCompile(clientTmpl)
+	scripts := scriptRE.FindAllSubmatch(res, -1)
+	for _, script := range scripts {
+		scriptURL, err := url.Parse(string(script[1]))
+		if err != nil {
+			log.Printf("[soundcloud] parsing script url: %s\n", err)
+			continue
+		}
+		scriptBody, err := utils.Fetch(scriptURL)
+		if err != nil {
+			log.Printf("[soundcloud] fetching script: %s\n", err)
+			continue
+		}
+		matches := clientRE.FindSubmatch(scriptBody)
+		if matches == nil {
+			continue
+		}
+		IE.clientID = string(matches[1])
+		if err := ioutil.WriteFile(tokenFile, matches[1], 0644); err != nil {
+			log.Printf("[soundcloud] updating token file: %s\n", err)
+		}
+		log.Println(IE.clientID)
+		return nil
+	}
+	return fmt.Errorf("can't retrieve token")
 }

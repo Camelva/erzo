@@ -2,13 +2,14 @@ package main
 
 import (
 	"bufio"
-	"encoding/json"
-	"erzo/loader"
-	"erzo/parsers"
 	"fmt"
+	"log"
 	"net/url"
 	"os"
 	"regexp"
+
+	"erzo/loaders"
+	"erzo/parsers"
 )
 
 const (
@@ -18,15 +19,17 @@ const (
 )
 
 func main() {
+
 	reader := bufio.NewReader(os.Stdin)
 	fmt.Print("Enter link: ")
 	userInput, _ := reader.ReadString('\n')
 	r, err := Get(userInput)
 	if err != nil {
-		fmt.Printf("err: %s", err)
+		log.Println(err)
+		return
 	}
 	//_ = r
-	fmt.Printf("Response: %s", r)
+	log.Println(r)
 }
 
 func Get(message string) (string, error) {
@@ -41,15 +44,15 @@ func Get(message string) (string, error) {
 	}
 
 	//fmt.Printf("%+v", info)
-	if err := PrettyPrint(info); err != nil {
-		return "", err
-	}
+	//if err := PrettyPrint(info); err != nil {
+	//	return "", err
+	//}
 
-	for _, format := range info.Formats {
-		fmt.Println(format["url"])
-	}
+	//for _, format := range info.Formats {
+	//	log.Println(format.Url)
+	//}
 
-	fileName, err := loader.Go(info.Formats)
+	fileName, err := loaders.Go(info.Formats)
 	if err != nil {
 		return "", err
 	}
@@ -67,10 +70,10 @@ func extractURL(message string) (*url.URL, error) {
 	return link, nil
 }
 
-func PrettyPrint(v interface{}) (err error) {
-	b, err := json.MarshalIndent(v, "", "  ")
-	if err == nil {
-		fmt.Println(string(b))
-	}
-	return
-}
+//func PrettyPrint(v interface{}) (err error) {
+//	b, err := json.MarshalIndent(v, "", "  ")
+//	if err == nil {
+//		fmt.Println(string(b))
+//	}
+//	return
+//}
