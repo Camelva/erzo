@@ -5,8 +5,8 @@ import (
 	"net/url"
 	"regexp"
 
-	"erzo/engine"
-	"erzo/parsers"
+	"github.com/camelva/erzo/engine"
+	"github.com/camelva/erzo/parsers"
 )
 
 type Extractor struct {

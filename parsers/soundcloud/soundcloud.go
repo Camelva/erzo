@@ -7,9 +7,9 @@ import (
 	"net/url"
 	"regexp"
 
-	"erzo/engine"
-	"erzo/parsers"
-	"erzo/utils"
+	"github.com/camelva/erzo/engine"
+	"github.com/camelva/erzo/parsers"
+	"github.com/camelva/erzo/utils"
 )
 
 var debugInstance = "soundcloud"

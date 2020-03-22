@@ -1,11 +1,12 @@
 package erzo
 
 import (
-	"erzo/engine"
-	_ "erzo/loaders/ffmpeg"
-	"erzo/parsers"
-	_ "erzo/parsers/soundcloud"
 	"fmt"
+
+	"github.com/camelva/erzo/engine"
+	_ "github.com/camelva/erzo/loaders/ffmpeg"
+	"github.com/camelva/erzo/parsers"
+	_ "github.com/camelva/erzo/parsers/soundcloud"
 )
 
 //func main() {

@@ -2,11 +2,12 @@ package ffmpeg
 
 import (
 	"bytes"
-	"erzo/engine"
-	"erzo/parsers"
 	"fmt"
 	"net/url"
 	"os/exec"
+
+	"github.com/camelva/erzo/engine"
+	"github.com/camelva/erzo/parsers"
 )
 
 var debugInstance = "ffmpeg"

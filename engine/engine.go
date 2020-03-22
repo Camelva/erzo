@@ -2,8 +2,6 @@ package engine
 
 import (
 	"errors"
-	"erzo/loaders"
-	"erzo/parsers"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -11,6 +9,9 @@ import (
 	"os"
 	"path"
 	"regexp"
+
+	"github.com/camelva/erzo/loaders"
+	"github.com/camelva/erzo/parsers"
 )
 
 var _extractors []parsers.Extractor

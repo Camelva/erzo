@@ -1,8 +1,9 @@
 package loaders
 
 import (
-	"erzo/parsers"
 	"net/url"
+
+	"github.com/camelva/erzo/parsers"
 )
 
 type Loader interface {
