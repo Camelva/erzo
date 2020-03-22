@@ -82,7 +82,7 @@ func (e Engine) extractInfo(u url.URL) (*parsers.ExtractorInfo, error) {
 		}
 		return info, nil
 	}
-	return nil, parsers.ErrNotSupported{Subject: u.Hostname()}
+	return nil, fmt.Errorf("unsupported service")
 }
 
 func (e Engine) downloadSong(info *parsers.ExtractorInfo) (string, error) {

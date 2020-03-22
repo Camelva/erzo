@@ -1,6 +1,7 @@
 package erzo
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/camelva/erzo/engine"
@@ -21,6 +22,14 @@ import (
 //	//_ = r
 //	log.Println(r)
 //}
+
+var (
+	ErrNotUrl               = errors.New("there is no valid url")
+	ErrNotSupportedFormat   = errors.New("this format unsupported yet")
+	ErrNotSupportedPlaylist = errors.New("playlists unsupported yet")
+	ErrNotSupportedService  = errors.New("this service unsupported yet")
+	ErrTryAgain             = errors.New("please try again")
+)
 
 type options struct {
 	output   string
@@ -82,13 +91,19 @@ func Get(message string, opts ...Option) (string, error) {
 	r, err := e.Process(message)
 	if err != nil {
 		if err == engine.ErrNotURL {
-			return "", fmt.Errorf("can't find valid url in your message")
+			return "", ErrNotUrl
 		}
-		if _, ok := err.(parsers.ErrNotSupported); ok {
-			return "", fmt.Errorf("this format not supported yet")
+		if err, ok := err.(parsers.ErrNotSupported); ok {
+			if err.Subject == "playlist" {
+				return "", ErrNotSupportedPlaylist
+			}
+			return "", ErrNotSupportedFormat
+		}
+		if err.Error() == "unsupported service" {
+			return "", ErrNotSupportedService
 		}
 		engine.Log("main", fmt.Errorf("can't process url `%s`. Error: %s", message, err))
-		return "", err
+		return "", ErrTryAgain
 	}
 	return r, nil
 }
