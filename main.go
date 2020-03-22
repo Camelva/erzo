@@ -1,79 +1,93 @@
-package main
+package erzo
 
 import (
-	"bufio"
-	"fmt"
-	"log"
-	"net/url"
-	"os"
-	"regexp"
-
-	"erzo/loaders"
+	"erzo/engine"
+	_ "erzo/loaders/ffmpeg"
 	"erzo/parsers"
+	_ "erzo/parsers/soundcloud"
+	"fmt"
 )
 
-const (
-	urlPattern = `((?:[a-z]{3,6}:\/\/)|(?:^|\s))` +
-		`((?:[a-zA-Z0-9\-]+\.)+[a-z]{2,13})` +
-		`([\.\?\=\&\%\/\w\-]*\b)`
-)
-
-func main() {
-
-	reader := bufio.NewReader(os.Stdin)
-	fmt.Print("Enter link: ")
-	userInput, _ := reader.ReadString('\n')
-	r, err := Get(userInput)
-	if err != nil {
-		log.Println(err)
-		return
-	}
-	//_ = r
-	log.Println(r)
-}
-
-func Get(message string) (string, error) {
-	urlObj, err := extractURL(message)
-	if err != nil {
-		return "", err
-	}
-
-	info, err := parsers.Parse(*urlObj)
-	if err != nil {
-		return "", err
-	}
-
-	//fmt.Printf("%+v", info)
-	//if err := PrettyPrint(info); err != nil {
-	//	return "", err
-	//}
-
-	//for _, format := range info.Formats {
-	//	log.Println(format.Url)
-	//}
-
-	fileName, err := loaders.Go(info.Formats)
-	if err != nil {
-		return "", err
-	}
-
-	return fileName, nil
-}
-
-func extractURL(message string) (*url.URL, error) {
-	re := regexp.MustCompile(urlPattern)
-	rawURL := re.FindString(message)
-	link, err := url.Parse(rawURL)
-	if err != nil {
-		return nil, err
-	}
-	return link, nil
-}
-
-//func PrettyPrint(v interface{}) (err error) {
-//	b, err := json.MarshalIndent(v, "", "  ")
-//	if err == nil {
-//		fmt.Println(string(b))
+//func main() {
+//	reader := bufio.NewReader(os.Stdin)
+//	fmt.Print("Enter link: ")
+//	userInput, _ := reader.ReadString('\n')
+//	r, err := Get(userInput)
+//	if err != nil {
+//		log.Println(err)
+//		return
 //	}
-//	return
+//	//_ = r
+//	log.Println(r)
 //}
+
+type options struct {
+	output   string
+	truncate bool
+	debug    bool
+}
+
+type Option interface {
+	apply(*options)
+}
+
+type truncateOption bool
+
+func (opt truncateOption) apply(opts *options) {
+	opts.truncate = bool(opt)
+}
+func Truncate(b bool) Option {
+	return truncateOption(b)
+}
+
+type outputOption string
+
+func (opt outputOption) apply(opts *options) {
+	opts.output = string(opt)
+}
+func Output(s string) Option {
+	return outputOption(s)
+}
+
+type debugOption bool
+
+func (opt debugOption) apply(opts *options) {
+	opts.debug = true
+}
+func Debug(b bool) Option {
+	return debugOption(b)
+}
+
+// Get process given url and download song from it.
+// @message - url to process
+// @options:
+// 		Truncate(true|false) - clear output folder before processing
+//		Output(string)		 - change output folder
+//		Debug(true|false)    - log debug info
+func Get(message string, opts ...Option) (string, error) {
+	options := options{
+		output:   "out",
+		truncate: false,
+		debug:    false,
+	}
+	for _, o := range opts {
+		o.apply(&options)
+	}
+	e := engine.New(
+		options.output,
+		options.truncate,
+		options.debug,
+	)
+	r, err := e.Process(message)
+	if err != nil {
+		if err == engine.ErrNotURL {
+			return "", fmt.Errorf("can't find valid url in your message")
+		}
+		if _, ok := err.(parsers.ErrNotSupported); ok {
+			return "", fmt.Errorf("this format not supported yet")
+		}
+		engine.Log("main", fmt.Errorf("can't process url `%s`. Error: %s", message, err))
+		return "", err
+	}
+	return r, nil
+}

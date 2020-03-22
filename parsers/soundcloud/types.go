@@ -4,27 +4,6 @@ import (
 	"time"
 )
 
-// Main struct with necessary info and methods
-type extractor struct {
-	urlPattern string
-	apiURL     string
-	api2URL    string
-	baseURL    string
-	clientID   string
-}
-
-// type for identifying url kind
-type urlKind int8
-
-// Struct containing info about user-provided url
-type scURL struct {
-	title  string
-	user   string
-	kind   urlKind
-	secret string
-	url    string
-}
-
 // old soundcloud response format. Maybe we will need it someday..
 var _ metadata
 

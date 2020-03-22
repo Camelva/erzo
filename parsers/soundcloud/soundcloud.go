@@ -4,13 +4,18 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/url"
 	"regexp"
 
-	"erzo/types"
+	"erzo/engine"
+	"erzo/parsers"
 	"erzo/utils"
 )
+
+var debugInstance = "soundcloud"
+
+// type for identifying url kind
+type urlKind int8
 
 // const for identifying user-provided url's type (kind)
 const (
@@ -37,6 +42,8 @@ func (k urlKind) String() string {
 
 const tokenFile = "parsers/soundcloud/token.txt"
 
+var IE extractor
+
 func init() {
 	//noinspection SpellCheckingInspection
 	clientIDBase := "psT32GLDMZ0TQKgfPkzrGIlco3PYA1kf"
@@ -51,44 +58,63 @@ func init() {
 
 	tokenBytes, err := ioutil.ReadFile(tokenFile)
 	if err != nil {
-		log.Printf("reading token file: %s\n", err)
+		engine.Log(debugInstance, fmt.Errorf("can't read file with token: %s", err))
 		return
 	}
 	tokenStr := string(tokenBytes)
 	if len(tokenStr) == 32 {
 		IE.clientID = tokenStr
 	}
+	engine.AddExtractor(IE)
 	return
 }
 
-var IE extractor
+// Main struct with necessary info and methods
+type extractor struct {
+	urlPattern string
+	apiURL     string
+	api2URL    string
+	baseURL    string
+	clientID   string
+}
 
-func (ie extractor) Compatible(s string) bool {
-	ok, err := regexp.MatchString(IE.urlPattern, s)
-	if err != nil {
-		log.Printf("[soundcloud] error while comparing: %s", err)
-		return false
-	}
+func (ie extractor) Compatible(u url.URL) bool {
+	s := u.Hostname()
+	ok, _ := regexp.MatchString(ie.urlPattern, s)
 	return ok
 }
 
-func (ie extractor) Extract(u url.URL) (*types.ExtractorInfo, error) {
+func (ie extractor) Extract(u url.URL) (*parsers.ExtractorInfo, error) {
 	sc := parseURL(u)
 	if sc.kind != _song {
-		err := types.ErrNotSupported{Subject: sc.kind.String()}
-		log.Printf("[soundcloud] %s\n", err)
+		err := parsers.ErrNotSupported{Subject: sc.kind.String()}
+		engine.Log(debugInstance, fmt.Errorf("extracting song info: %s", err))
 		return nil, err
 	}
 	metadata, err := resolve(sc.url)
 	if err != nil {
 		return nil, err
 	}
+	if metadata == nil {
+		err := fmt.Errorf("can't get info")
+		engine.Log(debugInstance, fmt.Errorf("resolving metadata: %s", err))
+		return nil, err
+	}
 	info, err := extractInfo(metadata)
 	if err != nil {
-		log.Printf("[soundcloud] extracting info: %s\n", err)
+		engine.Log(debugInstance, fmt.Errorf("extracting info: %s", err))
 		return nil, err
 	}
 	return info, nil
+}
+
+// Struct containing info about user-provided url
+type scURL struct {
+	title  string
+	user   string
+	kind   urlKind
+	secret string
+	url    string
 }
 
 func parseURL(u url.URL) *scURL {
@@ -120,13 +146,10 @@ func parseURL(u url.URL) *scURL {
 
 		switch urlKind(t) {
 		case _station:
-			log.Println("station")
 			uri = fmt.Sprintf("%sstations/track/%s/%s", IE.baseURL, user, title)
 		case _playlist:
-			log.Println("playlist")
 			uri = fmt.Sprintf("%ssets/%s/%s", IE.baseURL, user, title)
 		case _user:
-			log.Println("user")
 			uri = fmt.Sprintf("%s%s", IE.baseURL, user)
 		case _song:
 			if user == "stations" {
@@ -135,7 +158,6 @@ func parseURL(u url.URL) *scURL {
 			if title == "sets" {
 				continue
 			}
-			log.Println("song")
 			uri = fmt.Sprintf("%s%s/%s", IE.baseURL, user, title)
 		}
 		sc := scURL{
@@ -151,9 +173,10 @@ func parseURL(u url.URL) *scURL {
 }
 
 func resolve(link string) (*metadata2, error) {
-	resolveURL, err := url.Parse(fmt.Sprintf("%sresolve?url=%s", IE.api2URL, link))
+	_url := fmt.Sprintf("%sresolve?url=%s", IE.api2URL, link)
+	resolveURL, err := url.Parse(_url)
 	if err != nil {
-		log.Printf("[soundcloud] building resolve link: %s\n", err)
+		engine.Log(debugInstance, fmt.Errorf("parsing url `%s`: %s", _url, err))
 		return nil, err
 	}
 	res, err := fetch(resolveURL)
@@ -162,13 +185,13 @@ func resolve(link string) (*metadata2, error) {
 	}
 	var scMetadata = new(metadata2)
 	if err := json.Unmarshal(res, &scMetadata); err != nil {
-		log.Printf("[soundcloud] unmarshalling metadata response: %s\nResponse: %s\n", err, res)
+		engine.Log(debugInstance, fmt.Errorf("unmarshalling metadata: %s", err))
 		return nil, err
 	}
 	return scMetadata, nil
 }
 
-func extractInfo(info *metadata2) (*types.ExtractorInfo, error) {
+func extractInfo(info *metadata2) (*parsers.ExtractorInfo, error) {
 	formats, ok := info.getDownloadLink()
 	if !ok {
 		var err error
@@ -181,13 +204,11 @@ func extractInfo(info *metadata2) (*types.ExtractorInfo, error) {
 
 	duration := float32(info.Duration) * 1 / 1000
 
-	thumbnails, err := extractArtworks(info.ArtworkURL, info.User.AvatarURL)
-	if err != nil {
-		log.Printf("[soundcloud] extracting artworks: %s\n", err)
-	}
+	thumbnails := extractArtworks(info.ArtworkURL, info.User.AvatarURL)
 
-	var ExtractedInfo = &types.ExtractorInfo{
+	var ExtractedInfo = &parsers.ExtractorInfo{
 		ID:           info.ID,
+		Permalink:    info.Permalink,
 		Uploader:     info.User.Username,
 		UploaderID:   info.User.ID,
 		UploaderURL:  info.User.PermalinkURL,
@@ -209,47 +230,49 @@ func extractInfo(info *metadata2) (*types.ExtractorInfo, error) {
 	return ExtractedInfo, nil
 }
 
-func (info *metadata2) getDownloadLink() (types.Formats, bool) {
+func (info *metadata2) getDownloadLink() (parsers.Formats, bool) {
 	if !info.Downloadable || !info.HasDownloadsLeft {
 		return nil, false
 	}
 	dlURL, err := url.Parse(info.DownloadURL)
 	if err != nil {
-		log.Printf("[soundcloud] parsing download url: %s\n", err)
+		engine.Log(debugInstance, fmt.Errorf("can't parse url `%s`. Error: %s", info.DownloadURL, err))
 		return nil, false
 	}
 	q := dlURL.Query()
 	q.Set("client_id", IE.clientID)
 	query := q.Encode()
 	dlURL.RawQuery = query
-	format := types.Format{
+	format := parsers.Format{
 		Url:      dlURL.String(),
 		Ext:      "mp3",
 		Type:     "mpeg",
 		Protocol: "http",
 		Score:    100,
 	}
-	return []types.Format{format}, true
+	return []parsers.Format{format}, true
 }
 
-func (transcodings transcodings) extractFormats() (types.Formats, error) {
-	formats := make(types.Formats, 0)
+func (transcodings transcodings) extractFormats() (parsers.Formats, error) {
+	formats := make(parsers.Formats, 0)
 	for _, t := range transcodings {
 		formatURL, err := url.Parse(t.URL)
 		if err != nil {
-			return nil, err
+			engine.Log(debugInstance, fmt.Errorf("can't parse url `%s`. Error: %s", t.URL, err))
+			continue
 		}
 
 		stream, err := fetch(formatURL)
 		if err != nil {
-			return nil, err
+			continue
 		}
 
 		var streamObj struct {
 			URL string `json:"url"`
 		}
 		if err = json.Unmarshal(stream, &streamObj); err != nil {
-			return nil, err
+			engine.Log(debugInstance, fmt.Errorf("unmarshalling streamObj: %s", err))
+			continue
 		}
 
 		t.URL = streamObj.URL
@@ -260,7 +283,7 @@ func (transcodings transcodings) extractFormats() (types.Formats, error) {
 	return formats, nil
 }
 
-func extractArtworks(artwork string, avatar string) ([]types.Artwork, error) {
+func extractArtworks(artwork string, avatar string) []parsers.Artwork {
 	artworksMap := map[string]int{
 		"mini":     16,
 		"tiny":     20,
@@ -277,17 +300,19 @@ func extractArtworks(artwork string, avatar string) ([]types.Artwork, error) {
 		artwork = avatar
 	}
 
-	artworks := make([]types.Artwork, 0)
+	artworks := make([]parsers.Artwork, 0)
 
 	re := regexp.MustCompile(`-([0-9a-z]+)\.jpg`)
 	if !re.MatchString(artwork) {
-		return artworks, fmt.Errorf("there is no artworks")
+		err := fmt.Errorf("there is no artworks")
+		engine.Log(debugInstance, fmt.Errorf("extracting artworks: %s", err))
+		return artworks
 	}
 
 	for artType, artSize := range artworksMap {
 		newType := fmt.Sprintf("-%s.jpg", artType)
 		newURL := re.ReplaceAllString(artwork, newType)
-		var i = types.Artwork{
+		var i = parsers.Artwork{
 			Type: artType,
 			URL:  newURL,
 			Size: artSize,
@@ -295,23 +320,25 @@ func extractArtworks(artwork string, avatar string) ([]types.Artwork, error) {
 		artworks = append(artworks, i)
 	}
 
-	return artworks, nil
+	return artworks
 }
 
 func fetch(u *url.URL) ([]byte, error) {
 	// loop for two tries
-	for range []int{0, 0} {
+	for i := range []int{0, 0} {
 		q := u.Query()
 		q.Set("client_id", IE.clientID)
 		u.RawQuery = q.Encode()
 		res, err := utils.Fetch(u)
 		if err != nil {
-			log.Printf("[soundcloud] fetching url: %s\n", err)
-			return nil, err
+			engine.Log(debugInstance, fmt.Errorf("fetching url `%s`. Error: %s", u.String(), err))
+			continue
 		}
-		if len(res) < 1 {
+		if len(res) < 1 && i == 0 {
+			engine.Log(debugInstance, fmt.Errorf("updating token"))
 			if err := updateToken(); err != nil {
-				return nil, err
+				engine.Log(debugInstance, fmt.Errorf("while updationg token: %s", err))
+				continue
 			}
 			continue
 		}
@@ -324,7 +351,7 @@ func updateToken() error {
 	u, _ := url.Parse("https://soundcloud.com")
 	res, err := utils.Fetch(u)
 	if err != nil {
-		log.Printf("[soundcloud] fetching homepage: %s\n", err)
+		engine.Log(debugInstance, fmt.Errorf("updateToken() can't fetch homepage: %s\n", err))
 		return err
 	}
 	scriptTmpl := `<script[^>]+src="([^"]+)"`
@@ -333,14 +360,17 @@ func updateToken() error {
 	clientRE := regexp.MustCompile(clientTmpl)
 	scripts := scriptRE.FindAllSubmatch(res, -1)
 	for _, script := range scripts {
-		scriptURL, err := url.Parse(string(script[1]))
+		uri := string(script[1])
+		scriptURL, err := url.Parse(uri)
 		if err != nil {
-			log.Printf("[soundcloud] parsing script url: %s\n", err)
+			engine.Log(debugInstance,
+				fmt.Errorf("updateToken() can't parse script url `%s`. Error: %s", uri, err))
 			continue
 		}
 		scriptBody, err := utils.Fetch(scriptURL)
 		if err != nil {
-			log.Printf("[soundcloud] fetching script: %s\n", err)
+			engine.Log(debugInstance,
+				fmt.Errorf("updateToken() can't fetch script `%s`. Error: %s", scriptURL.String(), err))
 			continue
 		}
 		matches := clientRE.FindSubmatch(scriptBody)
@@ -349,9 +379,9 @@ func updateToken() error {
 		}
 		IE.clientID = string(matches[1])
 		if err := ioutil.WriteFile(tokenFile, matches[1], 0644); err != nil {
-			log.Printf("[soundcloud] updating token file: %s\n", err)
+			engine.Log(debugInstance,
+				fmt.Errorf("can't write new token to file `%s`: %s", tokenFile, err))
 		}
-		log.Println(IE.clientID)
 		return nil
 	}
 	return fmt.Errorf("can't retrieve token")

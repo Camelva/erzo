@@ -2,32 +2,72 @@ package ffmpeg
 
 import (
 	"bytes"
-	"erzo/types"
-	"log"
+	"erzo/engine"
+	"erzo/parsers"
+	"fmt"
 	"net/url"
 	"os/exec"
 )
 
-var config types.Loader
+var debugInstance = "ffmpeg"
 
-func init() {
-	bin, err := findBin()
-	if err != nil {
-		log.Println(err)
-	}
-	config = types.Loader{
-		Name:    "ffmpeg",
-		Bin:     bin,
-		Formats: []string{"http"},
-	}
+type loader struct {
+	name      string
+	bin       string
+	protocols []string
 }
 
-func findBin() (string, error) {
+func (l loader) Name() string {
+	return l.name
+}
+func (l loader) Bin() string {
+	return l.bin
+}
+func (l loader) Get(u *url.URL, outName string) error {
+	_, err := execute(
+		l.Bin(),
+		"-i",
+		u.String(),
+		"-c",
+		"copy",
+		outName,
+		//"-report",
+	)
+	if err != nil {
+		engine.Log(debugInstance, fmt.Errorf("can't execute command: %s", err))
+		return err
+	}
+	return nil
+}
+func (l loader) Compatible(f parsers.Format) bool {
+	for _, p := range l.protocols {
+		if p != f.Protocol {
+			continue
+		}
+		return true
+	}
+	return false
+}
+
+var config loader
+
+func init() {
+	protocols := []string{"http", "https", "hls", "progressive"}
+	bin := findBin()
+	if len(bin) < 1 {
+		engine.Log(debugInstance, fmt.Errorf("can't find ffmpeg binary"))
+		return
+	}
+	config = loader{"ffmpeg", bin, protocols}
+	engine.AddLoader(config)
+}
+
+func findBin() string {
 	path, err := exec.LookPath("ffmpeg")
 	if err != nil {
-		return "", err
+		return ""
 	}
-	return path, nil
+	return path
 }
 
 func execute(command ...string) (bytes.Buffer, error) {
@@ -40,28 +80,4 @@ func execute(command ...string) (bytes.Buffer, error) {
 		return out, err
 	}
 	return out, nil
-}
-
-//func Version() (string, error) {
-//	if config.Bin == "" {
-//		return "", fmt.Errorf("can't find ffmpeg")
-//	}
-//	res, err := execute(config.Bin, "-version")
-//	if err != nil {
-//		return "", err
-//	}
-//	return res.String(), nil
-//}
-
-func GetConfig() *types.Loader {
-	return &config
-}
-
-func Get(u *url.URL) (string, error) {
-	var outName = "song.mp3"
-	_, err := execute(config.Bin, "-i", u.String(), "-c", "copy", outName)
-	if err != nil {
-		return "", err
-	}
-	return outName, nil
 }
