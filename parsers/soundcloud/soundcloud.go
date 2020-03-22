@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/url"
+	"os"
+	"path"
 	"regexp"
 
 	"github.com/camelva/erzo/engine"
@@ -40,7 +42,7 @@ func (k urlKind) String() string {
 	}
 }
 
-const tokenFile = "parsers/soundcloud/token.txt"
+var tokenFile = path.Join(os.TempDir(), "soundcloud-token.txt")
 
 var IE extractor
 
@@ -56,14 +58,11 @@ func init() {
 		clientID:   clientIDBase,
 	}
 
-	tokenBytes, err := ioutil.ReadFile(tokenFile)
-	if err != nil {
-		engine.Log(debugInstance, fmt.Errorf("can't read file with token: %s", err))
-		return
-	}
-	tokenStr := string(tokenBytes)
-	if len(tokenStr) == 32 {
-		IE.clientID = tokenStr
+	if tokenBytes, err := ioutil.ReadFile(tokenFile); err == nil {
+		tokenStr := string(tokenBytes)
+		if len(tokenStr) == 32 {
+			IE.clientID = tokenStr
+		}
 	}
 	engine.AddExtractor(IE)
 	return
@@ -118,7 +117,7 @@ type scURL struct {
 }
 
 func parseURL(u url.URL) *scURL {
-	path := u.EscapedPath()
+	urlPath := u.EscapedPath()
 	stationTmpl := `^/(?:stations)/(?:track)/([\w-]+)/([\w-]+)(?:|/|/([\w-]+)/?)$`
 	stationRE := regexp.MustCompile(stationTmpl)
 	playlistTmpl := `^/([\w-]+)/(?:sets)/([\w-]+)(?:|/|/([\w-]+)/?)$`
@@ -129,7 +128,7 @@ func parseURL(u url.URL) *scURL {
 	songRE := regexp.MustCompile(songTmpl)
 	kinds := []*regexp.Regexp{_station: stationRE, _playlist: playlistRE, _user: userRE, _song: songRE}
 	for t, k := range kinds {
-		result := k.FindStringSubmatch(path)
+		result := k.FindStringSubmatch(urlPath)
 		if result == nil {
 			continue
 		}
