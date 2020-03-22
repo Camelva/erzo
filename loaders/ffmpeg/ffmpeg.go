@@ -64,9 +64,10 @@ func init() {
 }
 
 func findBin() string {
-	path, err := exec.LookPath("ffmpeg")
+	bin := "ffmpeg"
+	path, err := exec.LookPath(bin)
 	if err != nil {
-		return ""
+		path = bin
 	}
 	return path
 }
