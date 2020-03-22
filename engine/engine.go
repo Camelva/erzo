@@ -87,7 +87,7 @@ func (e Engine) extractInfo(u url.URL) (*parsers.ExtractorInfo, error) {
 
 func (e Engine) downloadSong(info *parsers.ExtractorInfo) (string, error) {
 	if _, err := ioutil.ReadDir(e.outputFolder); err != nil {
-		if err := os.Mkdir(e.outputFolder, 0755); err != nil {
+		if err := os.Mkdir(e.outputFolder, 0700); err != nil {
 			Log(debugInstance, fmt.Errorf("can't create folder"))
 			e.outputFolder = ""
 		}
