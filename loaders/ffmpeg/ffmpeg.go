@@ -24,7 +24,7 @@ func (l loader) Bin() string {
 	return l.bin
 }
 func (l loader) Get(u *url.URL, outName string) error {
-	res, err := execute(
+	_, err := execute(
 		l.Bin(),
 		"-i",
 		u.String(),
@@ -37,7 +37,6 @@ func (l loader) Get(u *url.URL, outName string) error {
 		engine.Log(debugInstance, fmt.Errorf("can't execute command: %s", err))
 		return err
 	}
-	engine.Log(debugInstance, fmt.Errorf("%s", res))
 	return nil
 }
 func (l loader) Compatible(f parsers.Format) bool {
