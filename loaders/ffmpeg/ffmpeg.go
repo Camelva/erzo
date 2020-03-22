@@ -1,7 +1,6 @@
 package ffmpeg
 
 import (
-	"bytes"
 	"fmt"
 	"net/url"
 	"os/exec"
@@ -25,7 +24,7 @@ func (l loader) Bin() string {
 	return l.bin
 }
 func (l loader) Get(u *url.URL, outName string) error {
-	_, err := execute(
+	res, err := execute(
 		l.Bin(),
 		"-i",
 		u.String(),
@@ -38,6 +37,7 @@ func (l loader) Get(u *url.URL, outName string) error {
 		engine.Log(debugInstance, fmt.Errorf("can't execute command: %s", err))
 		return err
 	}
+	engine.Log(debugInstance, fmt.Errorf("%s", res))
 	return nil
 }
 func (l loader) Compatible(f parsers.Format) bool {
@@ -72,12 +72,9 @@ func findBin() string {
 	return path
 }
 
-func execute(command ...string) (bytes.Buffer, error) {
-	var out bytes.Buffer
-
+func execute(command ...string) ([]byte, error) {
 	cmd := exec.Command(command[0], command[1:]...)
-	cmd.Stdout = &out
-	err := cmd.Run()
+	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return out, err
 	}
