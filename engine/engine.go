@@ -3,7 +3,6 @@ package engine
 import (
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/url"
 	"os"
 	"path"
@@ -137,9 +136,9 @@ func (e Engine) extractInfo(u url.URL) (*parsers.ExtractorInfo, error) {
 		if err != nil {
 			switch err.(type) {
 			case parsers.ErrFormatNotSupported:
-				return nil, err.(ErrUnsupportedType)
+				return nil, ErrUnsupportedType{err.(parsers.ErrFormatNotSupported)}
 			case parsers.ErrCantContinue:
-				return nil, err.(ErrDownloadingError)
+				return nil, ErrDownloadingError{err.Error()}
 			default:
 				return nil, ErrUndefined{}
 			}
@@ -157,8 +156,7 @@ func (e Engine) downloadSong(info *parsers.ExtractorInfo) (string, error) {
 			e.outputFolder = ""
 		}
 	}
-	outFile := fmt.Sprintf("%s.mp3", info.Permalink)
-	outPath := path.Join(e.outputFolder, outFile)
+	outPath := makeFilePath(e.outputFolder, info.Permalink)
 	var downloadingErr error
 	for _, format := range info.Formats {
 		u, err := url.Parse(format.Url)
@@ -185,6 +183,16 @@ func (e Engine) downloadSong(info *parsers.ExtractorInfo) (string, error) {
 	return "", ErrUnsupportedProtocol{}
 }
 
+func makeFilePath(folder string, title string) string {
+	fileName := fmt.Sprintf("%s.mp3", title)
+	outPath := path.Join(folder, fileName)
+	//if _, err := ioutil.ReadFile(outPath); err == nil {
+	//	title = fmt.Sprintf("%s-copy", title)
+	//	return makeFilePath(folder, title)
+	//}
+	return outPath
+}
+
 // extractURL trying to extract url from message
 func extractURL(message string) (u *url.URL, ok bool) {
 	re := regexp.MustCompile(_urlPattern)
@@ -194,7 +202,6 @@ func extractURL(message string) (u *url.URL, ok bool) {
 	}
 	link, err := url.Parse(rawURL)
 	if err != nil {
-		log.Printf("[engine] extractURL(): %s\n", err)
 		return nil, false
 	}
 	return link, true

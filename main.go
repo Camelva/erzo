@@ -1,40 +1,36 @@
 package erzo
 
 import (
-	"errors"
-	"fmt"
-
 	"github.com/camelva/erzo/engine"
 	_ "github.com/camelva/erzo/loaders/ffmpeg"
-	"github.com/camelva/erzo/parsers"
 	_ "github.com/camelva/erzo/parsers/soundcloud"
 )
 
-//func main() {
-//	reader := bufio.NewReader(os.Stdin)
-//	fmt.Print("Enter link: ")
-//	userInput, _ := reader.ReadString('\n')
-//	r, err := Get(userInput)
-//	if err != nil {
-//		log.Println(err)
-//		return
-//	}
-//	//_ = r
-//	log.Println(r)
-//}
-
-var (
-	ErrNotUrl               = errors.New("there is no valid url")
-	ErrNotSupportedFormat   = errors.New("this format unsupported yet")
-	ErrNotSupportedPlaylist = errors.New("playlists unsupported yet")
-	ErrNotSupportedService  = errors.New("this service unsupported yet")
-	ErrTryAgain             = errors.New("please try again")
-)
+type ErrNotURL struct {
+	engine.ErrNotURL
+}
+type ErrUnsupportedService struct {
+	engine.ErrUnsupportedService
+}
+type ErrUnsupportedType struct {
+	engine.ErrUnsupportedType
+}
+type ErrCantFetchInfo struct {
+	engine.ErrCantFetchInfo
+}
+type ErrUnsupportedProtocol struct {
+	engine.ErrUnsupportedProtocol
+}
+type ErrDownloadingError struct {
+	engine.ErrDownloadingError
+}
+type ErrUndefined struct {
+	engine.ErrUndefined
+}
 
 type options struct {
 	output   string
 	truncate bool
-	debug    bool
 }
 
 type Option interface {
@@ -59,26 +55,23 @@ func Output(s string) Option {
 	return outputOption(s)
 }
 
-type debugOption bool
-
-func (opt debugOption) apply(opts *options) {
-	opts.debug = true
-}
-func Debug(b bool) Option {
-	return debugOption(b)
-}
-
 // Get process given url and download song from it.
 // @message - url to process
 // @options:
 // 		Truncate(true|false) - clear output folder before processing
 //		Output(string)		 - change output folder
-//		Debug(true|false)    - log debug info
+// Return filename or one of the following errors:
+// ErrNotURL if there is no urls in your message
+// ErrUnsupportedService if url belongs to unsupported service
+// ErrUnsupportedType if service supported but certain type - not yet
+// ErrCantFetchInfo if fatal error occurred while extracting info from url
+// ErrUnsupportedProtocol if there is no downloader for this format
+// ErrDownloadingError if fatal error occurred while downloading song
+// ErrUndefined any other errors
 func Get(message string, opts ...Option) (string, error) {
 	options := options{
 		output:   "out",
 		truncate: false,
-		debug:    false,
 	}
 	for _, o := range opts {
 		o.apply(&options)
@@ -86,24 +79,29 @@ func Get(message string, opts ...Option) (string, error) {
 	e := engine.New(
 		options.output,
 		options.truncate,
-		options.debug,
 	)
 	r, err := e.Process(message)
 	if err != nil {
-		if err == engine.ErrNotURL {
-			return "", ErrNotUrl
+		var convertedErr error
+		switch err.(type) {
+		case engine.ErrNotURL:
+			convertedErr = ErrNotURL{err.(engine.ErrNotURL)}
+		case engine.ErrUnsupportedService:
+			convertedErr = ErrUnsupportedService{err.(engine.ErrUnsupportedService)}
+		case engine.ErrUnsupportedType:
+			convertedErr = ErrUnsupportedType{err.(engine.ErrUnsupportedType)}
+		case engine.ErrCantFetchInfo:
+			convertedErr = ErrCantFetchInfo{err.(engine.ErrCantFetchInfo)}
+		case engine.ErrUnsupportedProtocol:
+			convertedErr = ErrUnsupportedProtocol{err.(engine.ErrUnsupportedProtocol)}
+		case engine.ErrDownloadingError:
+			convertedErr = ErrDownloadingError{err.(engine.ErrDownloadingError)}
+		case engine.ErrUndefined:
+			convertedErr = ErrUndefined{err.(engine.ErrUndefined)}
+		default:
+			convertedErr = ErrUndefined{engine.ErrUndefined{}}
 		}
-		if err, ok := err.(parsers.ErrNotSupported); ok {
-			if err.Subject == "playlist" {
-				return "", ErrNotSupportedPlaylist
-			}
-			return "", ErrNotSupportedFormat
-		}
-		if err.Error() == "unsupported service" {
-			return "", ErrNotSupportedService
-		}
-		engine.Log("main", fmt.Errorf("can't process url `%s`. Error: %s", message, err))
-		return "", ErrTryAgain
+		return "", convertedErr
 	}
 	return r, nil
 }
