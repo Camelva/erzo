@@ -13,12 +13,20 @@ type Extractor interface {
 	Compatible(url.URL) bool
 }
 
-type ErrNotSupported struct {
-	Subject string
+type ErrFormatNotSupported struct {
+	Format string
 }
 
-func (e ErrNotSupported) Error() string {
-	return fmt.Sprintf("'%s' not supported yet", e.Subject)
+func (e ErrFormatNotSupported) Error() string {
+	return fmt.Sprintf("format %s not supported yet", e.Format)
+}
+
+type ErrCantContinue struct {
+	Reason string
+}
+
+func (e ErrCantContinue) Error() string {
+	return fmt.Sprintf("error %s interrupted process", e.Reason)
 }
 
 type Format struct {
@@ -28,6 +36,7 @@ type Format struct {
 	Protocol string
 	Score    int
 }
+
 type Formats []Format
 
 func (formats *Formats) Add(t Transcodinger) {

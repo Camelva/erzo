@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/url"
 	"os"
 	"path"
@@ -14,17 +15,16 @@ import (
 	"github.com/camelva/erzo/utils"
 )
 
-var debugInstance = "soundcloud"
-
 // type for identifying url kind
 type urlKind int8
 
 // const for identifying user-provided url's type (kind)
 const (
-	_song urlKind = iota
-	_playlist
+	_playlist urlKind = iota + 1
 	_station
 	_user
+
+	_song // song should be latest element
 )
 
 func (k urlKind) String() string {
@@ -86,23 +86,15 @@ func (ie extractor) Compatible(u url.URL) bool {
 func (ie extractor) Extract(u url.URL) (*parsers.ExtractorInfo, error) {
 	sc := parseURL(u)
 	if sc.kind != _song {
-		err := parsers.ErrNotSupported{Subject: sc.kind.String()}
-		engine.Log(debugInstance, fmt.Errorf("extracting song info: %s", err))
-		return nil, err
+		return nil, parsers.ErrFormatNotSupported{Format: sc.kind.String()}
 	}
 	metadata, err := resolve(sc.url)
-	if err != nil {
-		return nil, err
-	}
-	if metadata == nil {
-		err := fmt.Errorf("can't get info")
-		engine.Log(debugInstance, fmt.Errorf("resolving metadata: %s", err))
-		return nil, err
+	if err != nil || metadata == nil {
+		return nil, parsers.ErrCantContinue{Reason: "can't get song metadata"}
 	}
 	info, err := extractInfo(metadata)
 	if err != nil {
-		engine.Log(debugInstance, fmt.Errorf("extracting info: %s", err))
-		return nil, err
+		return nil, parsers.ErrCantContinue{Reason: err.Error()}
 	}
 	return info, nil
 }
@@ -151,10 +143,8 @@ func parseURL(u url.URL) *scURL {
 		case _user:
 			uri = fmt.Sprintf("%s%s", IE.baseURL, user)
 		case _song:
-			if user == "stations" {
-				continue
-			}
-			if title == "sets" {
+			if (user == "stations") || (title == "sets") {
+				log.Println("take a look into [soundcloud.go] parseUrl()")
 				continue
 			}
 			uri = fmt.Sprintf("%s%s/%s", IE.baseURL, user, title)
@@ -172,20 +162,18 @@ func parseURL(u url.URL) *scURL {
 }
 
 func resolve(link string) (*metadata2, error) {
-	_url := fmt.Sprintf("%sresolve?url=%s", IE.api2URL, link)
-	resolveURL, err := url.Parse(_url)
+	uri := fmt.Sprintf("%sresolve?url=%s", IE.api2URL, link)
+	resolveURL, err := url.Parse(uri)
 	if err != nil {
-		engine.Log(debugInstance, fmt.Errorf("parsing url `%s`: %s", _url, err))
-		return nil, err
+		return nil, parsers.ErrCantContinue{Reason: fmt.Sprintf("can't parse url: %s", uri)}
 	}
 	res, err := fetch(resolveURL)
 	if err != nil {
-		return nil, err
+		return nil, parsers.ErrCantContinue{Reason: "can't fetch resolve url"}
 	}
 	var scMetadata = new(metadata2)
 	if err := json.Unmarshal(res, &scMetadata); err != nil {
-		engine.Log(debugInstance, fmt.Errorf("unmarshalling metadata: %s", err))
-		return nil, err
+		return nil, parsers.ErrCantContinue{Reason: "can't unmarshal fetched metadata"}
 	}
 	return scMetadata, nil
 }
@@ -197,7 +185,7 @@ func extractInfo(info *metadata2) (*parsers.ExtractorInfo, error) {
 		transcodings := info.Media.Transcodings
 		formats, err = transcodings.extractFormats()
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("can't extract formats from transcodings")
 		}
 	}
 
@@ -229,13 +217,13 @@ func extractInfo(info *metadata2) (*parsers.ExtractorInfo, error) {
 	return ExtractedInfo, nil
 }
 
-func (info *metadata2) getDownloadLink() (parsers.Formats, bool) {
+func (info *metadata2) getDownloadLink() (formats parsers.Formats, ok bool) {
 	if !info.Downloadable || !info.HasDownloadsLeft {
 		return nil, false
 	}
 	dlURL, err := url.Parse(info.DownloadURL)
 	if err != nil {
-		engine.Log(debugInstance, fmt.Errorf("can't parse url `%s`. Error: %s", info.DownloadURL, err))
+		// invalid url, just return false
 		return nil, false
 	}
 	q := dlURL.Query()
@@ -257,12 +245,12 @@ func (transcodings transcodings) extractFormats() (parsers.Formats, error) {
 	for _, t := range transcodings {
 		formatURL, err := url.Parse(t.URL)
 		if err != nil {
-			engine.Log(debugInstance, fmt.Errorf("can't parse url `%s`. Error: %s", t.URL, err))
+			// invalid url, continue cycle
 			continue
 		}
-
 		stream, err := fetch(formatURL)
 		if err != nil {
+			// can't fetch url, continue cycle
 			continue
 		}
 
@@ -270,13 +258,16 @@ func (transcodings transcodings) extractFormats() (parsers.Formats, error) {
 			URL string `json:"url"`
 		}
 		if err = json.Unmarshal(stream, &streamObj); err != nil {
-			engine.Log(debugInstance, fmt.Errorf("unmarshalling streamObj: %s", err))
+			// invalid json, continue cycle
 			continue
 		}
 
 		t.URL = streamObj.URL
 
 		formats.Add(t)
+	}
+	if len(formats) < 1 {
+		return nil, fmt.Errorf("not found valid formats inside transodings")
 	}
 	formats.Sort()
 	return formats, nil
@@ -303,8 +294,7 @@ func extractArtworks(artwork string, avatar string) []parsers.Artwork {
 
 	re := regexp.MustCompile(`-([0-9a-z]+)\.jpg`)
 	if !re.MatchString(artwork) {
-		err := fmt.Errorf("there is no artworks")
-		engine.Log(debugInstance, fmt.Errorf("extracting artworks: %s", err))
+		// no artworks, return empty slice
 		return artworks
 	}
 
@@ -330,13 +320,12 @@ func fetch(u *url.URL) ([]byte, error) {
 		u.RawQuery = q.Encode()
 		res, err := utils.Fetch(u)
 		if err != nil {
-			engine.Log(debugInstance, fmt.Errorf("fetching url `%s`. Error: %s", u.String(), err))
+			// another try
 			continue
 		}
 		if len(res) < 1 && i == 0 {
-			engine.Log(debugInstance, fmt.Errorf("updating token"))
+			// if its first fault, try update token
 			if err := updateToken(); err != nil {
-				engine.Log(debugInstance, fmt.Errorf("while updationg token: %s", err))
 				continue
 			}
 			continue
@@ -347,10 +336,10 @@ func fetch(u *url.URL) ([]byte, error) {
 }
 
 func updateToken() error {
+	// we are sure in this url, so can skip error
 	u, _ := url.Parse("https://soundcloud.com")
 	res, err := utils.Fetch(u)
 	if err != nil {
-		engine.Log(debugInstance, fmt.Errorf("updateToken() can't fetch homepage: %s\n", err))
 		return err
 	}
 	scriptTmpl := `<script[^>]+src="([^"]+)"`
@@ -362,14 +351,12 @@ func updateToken() error {
 		uri := string(script[1])
 		scriptURL, err := url.Parse(uri)
 		if err != nil {
-			engine.Log(debugInstance,
-				fmt.Errorf("updateToken() can't parse script url `%s`. Error: %s", uri, err))
+			// can't parse script url. It's not fatal for us, so just ignore this
 			continue
 		}
 		scriptBody, err := utils.Fetch(scriptURL)
 		if err != nil {
-			engine.Log(debugInstance,
-				fmt.Errorf("updateToken() can't fetch script `%s`. Error: %s", scriptURL.String(), err))
+			// can't fetch script. It's not fatal for us, so just ignore this
 			continue
 		}
 		matches := clientRE.FindSubmatch(scriptBody)
@@ -377,10 +364,8 @@ func updateToken() error {
 			continue
 		}
 		IE.clientID = string(matches[1])
-		if err := ioutil.WriteFile(tokenFile, matches[1], 0644); err != nil {
-			engine.Log(debugInstance,
-				fmt.Errorf("can't write new token to file `%s`: %s", tokenFile, err))
-		}
+		// just ignore error
+		ioutil.WriteFile(tokenFile, matches[1], 0644)
 		return nil
 	}
 	return fmt.Errorf("can't retrieve token")

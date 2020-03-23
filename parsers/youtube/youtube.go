@@ -1,7 +1,6 @@
 package youtube
 
 import (
-	"fmt"
 	"net/url"
 	"regexp"
 
@@ -17,8 +16,6 @@ type Extractor struct {
 
 var IE Extractor
 
-var debugInstance = "youtube"
-
 func init() {
 	IE = Extractor{
 		urlPattern: `(?:www\.)?(?:youtube\.com|youtu.be)`,
@@ -30,17 +27,12 @@ func init() {
 
 func (ie Extractor) Compatible(u url.URL) bool {
 	s := u.Hostname()
-	ok, err := regexp.MatchString(IE.urlPattern, s)
-	if err != nil {
-		engine.Log(debugInstance, fmt.Errorf("comparing url: %s", err))
-		return false
-	}
+	ok, _ := regexp.MatchString(IE.urlPattern, s)
 	return ok
 }
 
 func (ie Extractor) Extract(u url.URL) (*parsers.ExtractorInfo, error) {
 	_ = u
 	info := &parsers.ExtractorInfo{}
-	engine.Log(debugInstance, fmt.Errorf("extracting YouTube url"))
-	return info, nil
+	return info, parsers.ErrFormatNotSupported{Format: "Youtube"}
 }

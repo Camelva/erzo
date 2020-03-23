@@ -1,7 +1,6 @@
 package engine
 
 import (
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -17,16 +16,57 @@ import (
 var _extractors []parsers.Extractor
 var _loaders []loaders.Loader
 
-var _debug bool
-var debugInstance = "engine"
-
 const (
 	_urlPattern = `((?:[a-z]{3,6}:\/\/)|(?:^|\s))` +
 		`((?:[a-zA-Z0-9\-]+\.)+[a-z]{2,13})` +
 		`([\.\?\=\&\%\/\w\-]*\b)`
 )
 
-var ErrNotURL = errors.New("there is no valid url")
+type ErrNotURL struct{}
+
+func (ErrNotURL) Error() string {
+	return "there is no valid url"
+}
+
+type ErrUndefined struct{}
+
+func (ErrUndefined) Error() string {
+	return "undefined error"
+}
+
+// parsers errors
+type ErrUnsupportedService struct {
+	Service string
+}
+
+func (e ErrUnsupportedService) Error() string {
+	return fmt.Sprintf("%s unsupported yet", e.Service)
+}
+
+type ErrUnsupportedType struct {
+	parsers.ErrFormatNotSupported
+}
+
+type ErrCantFetchInfo struct {
+	parsers.ErrCantContinue
+}
+
+// loaders errors
+type ErrUnsupportedProtocol struct {
+	Protocol string
+}
+
+func (ErrUnsupportedProtocol) Error() string {
+	return "current loaders don't work with this protocol"
+}
+
+type ErrDownloadingError struct {
+	Reason string
+}
+
+func (e ErrDownloadingError) Error() string {
+	return fmt.Sprintf("can't download this song: %s", e.Reason)
+}
 
 func AddExtractor(x parsers.Extractor) {
 	_extractors = append(_extractors, x)
@@ -41,23 +81,41 @@ type Engine struct {
 	outputFolder string
 }
 
-func New(out string, truncate bool, debug bool) *Engine {
-	_debug = debug
+// New return new instance of Engine
+func New(out string, truncate bool) *Engine {
+	if (len(_extractors) < 1) || (len(_loaders) < 1) {
+		// we need at least 1 extractor and 1 loader for work
+		return nil
+	}
 	e := &Engine{
 		extractors:   _extractors,
 		loaders:      _loaders,
 		outputFolder: out,
 	}
 	if truncate {
-		e.clean()
+		e.Clean()
 	}
 	return e
 }
 
+// Clean current e.OutputFolder directory
+func (e Engine) Clean() {
+	os.RemoveAll(e.outputFolder)
+	return
+}
+
+// Process your message. Return file name or one of this errors:
+// ErrNotURL if there is no urls in your message
+// ErrUnsupportedService if url belongs to unsupported service
+// ErrUnsupportedType if service supported but certain type - not yet
+// ErrCantFetchInfo if fatal error occurred while extracting info from url
+// ErrUnsupportedProtocol if there is no downloader for this format
+// ErrDownloadingError if fatal error occurred while downloading song
+// ErrUndefined any other errors
 func (e Engine) Process(s string) (string, error) {
 	u, ok := extractURL(s)
 	if !ok {
-		return "", ErrNotURL
+		return "", ErrNotURL{}
 	}
 	info, err := e.extractInfo(*u)
 	if err != nil {
@@ -77,50 +135,57 @@ func (e Engine) extractInfo(u url.URL) (*parsers.ExtractorInfo, error) {
 		}
 		info, err := xtr.Extract(u)
 		if err != nil {
-			Log(debugInstance, fmt.Errorf("can't extract info: %s", err))
-			return nil, err
+			switch err.(type) {
+			case parsers.ErrFormatNotSupported:
+				return nil, err.(ErrUnsupportedType)
+			case parsers.ErrCantContinue:
+				return nil, err.(ErrDownloadingError)
+			default:
+				return nil, ErrUndefined{}
+			}
 		}
 		return info, nil
 	}
-	return nil, fmt.Errorf("unsupported service")
+	return nil, ErrUnsupportedService{Service: u.Hostname()}
 }
 
 func (e Engine) downloadSong(info *parsers.ExtractorInfo) (string, error) {
 	if _, err := ioutil.ReadDir(e.outputFolder); err != nil {
+		// outputFolder don't exist. Creating it...
 		if err := os.Mkdir(e.outputFolder, 0700); err != nil {
-			Log(debugInstance, fmt.Errorf("can't create folder"))
+			// can't create outPutFolder. Going to save files in root directory
 			e.outputFolder = ""
 		}
 	}
 	outFile := fmt.Sprintf("%s.mp3", info.Permalink)
 	outPath := path.Join(e.outputFolder, outFile)
+	var downloadingErr error
 	for _, format := range info.Formats {
 		u, err := url.Parse(format.Url)
 		if err != nil {
-			Log(debugInstance, fmt.Errorf("can't parse format url: %s", err))
+			// invalid url, try another
 			continue
 		}
 		for _, ldr := range e.loaders {
 			if !ldr.Compatible(format) {
+				// incompatible with loader, try another one
 				continue
 			}
 			if err := ldr.Get(u, outPath); err != nil {
-				Log(debugInstance, fmt.Errorf("loader cant retrieve url: %s", err))
+				// save err
+				downloadingErr = err
 				continue
 			}
 			return outPath, nil
 		}
 	}
-	return "", fmt.Errorf("unsupported protocol")
-}
-
-func (e Engine) clean() {
-	if err := os.RemoveAll(e.outputFolder); err != nil {
-		Log(debugInstance, fmt.Errorf("clean(): %s", err))
+	if downloadingErr != nil {
+		return "", ErrDownloadingError{Reason: downloadingErr.Error()}
 	}
-	return
+	return "", ErrUnsupportedProtocol{}
 }
 
+// extractURL trying to extract url from message
 func extractURL(message string) (u *url.URL, ok bool) {
 	re := regexp.MustCompile(_urlPattern)
 	rawURL := re.FindString(message)
@@ -133,12 +198,4 @@ func extractURL(message string) (u *url.URL, ok bool) {
 		return nil, false
 	}
 	return link, true
-}
-
-func Log(instance string, err error) {
-	if !_debug {
-		return
-	}
-	msg := fmt.Sprintf("[%s] %s", instance, err.Error())
-	log.Println(msg)
 }

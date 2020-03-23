@@ -1,15 +1,11 @@
 package ffmpeg
 
 import (
-	"fmt"
-	"net/url"
-	"os/exec"
-
 	"github.com/camelva/erzo/engine"
 	"github.com/camelva/erzo/parsers"
+	"net/url"
+	"os/exec"
 )
-
-var debugInstance = "ffmpeg"
 
 type loader struct {
 	name      string
@@ -34,7 +30,6 @@ func (l loader) Get(u *url.URL, outName string) error {
 		//"-report",
 	)
 	if err != nil {
-		engine.Log(debugInstance, fmt.Errorf("can't execute command: %s", err))
 		return err
 	}
 	return nil
@@ -55,7 +50,7 @@ func init() {
 	protocols := []string{"http", "https", "hls", "progressive"}
 	bin := findBin()
 	if len(bin) < 1 {
-		engine.Log(debugInstance, fmt.Errorf("can't find ffmpeg binary"))
+		// not found binary, so don't init loader
 		return
 	}
 	config = loader{"ffmpeg", bin, protocols}
