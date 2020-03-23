@@ -8,7 +8,6 @@ import (
 func TestGet(t *testing.T) {
 	var outFolder = "test_out"
 	var trunc = false
-	var dbg = true
 
 	type args struct {
 		message string
@@ -52,7 +51,7 @@ func TestGet(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := Get(tt.args.message, Output(outFolder), Truncate(trunc), Debug(dbg))
+			got, err := Get(tt.args.message, Output(outFolder), Truncate(trunc))
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Get() error = %v, wantErr %v", err, tt.wantErr)
 				return
