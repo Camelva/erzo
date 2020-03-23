@@ -13,6 +13,17 @@ type loader struct {
 	protocols []string
 }
 
+func init() {
+	protocols := []string{"http", "https", "hls", "progressive"}
+	bin := findBin()
+	if len(bin) < 1 {
+		// not found binary, so don't init loader
+		return
+	}
+	config = loader{"ffmpeg", bin, protocols}
+	engine.AddLoader(config)
+}
+
 func (l loader) Name() string {
 	return l.name
 }
@@ -22,18 +33,20 @@ func (l loader) Bin() string {
 func (l loader) Get(u *url.URL, outName string) error {
 	_, err := execute(
 		l.Bin(),
+		"-y", // overwrite existing files
 		"-i",
 		u.String(),
 		"-c",
 		"copy",
 		outName,
-		//"-report",
+		//"-report", // only for debug
 	)
 	if err != nil {
 		return err
 	}
 	return nil
 }
+
 func (l loader) Compatible(f parsers.Format) bool {
 	for _, p := range l.protocols {
 		if p != f.Protocol {
@@ -45,17 +58,6 @@ func (l loader) Compatible(f parsers.Format) bool {
 }
 
 var config loader
-
-func init() {
-	protocols := []string{"http", "https", "hls", "progressive"}
-	bin := findBin()
-	if len(bin) < 1 {
-		// not found binary, so don't init loader
-		return
-	}
-	config = loader{"ffmpeg", bin, protocols}
-	engine.AddLoader(config)
-}
 
 func findBin() string {
 	bin := "ffmpeg"

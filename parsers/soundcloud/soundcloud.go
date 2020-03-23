@@ -118,8 +118,13 @@ func parseURL(u url.URL) *scURL {
 	userRE := regexp.MustCompile(userTmpl)
 	songTmpl := `^/([\w-]+)/([\w-]+)(?:|/|/([\w-]+)/?)$`
 	songRE := regexp.MustCompile(songTmpl)
-	kinds := []*regexp.Regexp{_station: stationRE, _playlist: playlistRE, _user: userRE, _song: songRE}
-	for t, k := range kinds {
+	kinds := map[urlKind]*regexp.Regexp{
+		_station:  stationRE,
+		_playlist: playlistRE,
+		_user:     userRE,
+		_song:     songRE,
+	}
+	for idx, k := range kinds {
 		result := k.FindStringSubmatch(urlPath)
 		if result == nil {
 			continue
@@ -135,7 +140,7 @@ func parseURL(u url.URL) *scURL {
 			secret = result[3]
 		}
 
-		switch urlKind(t) {
+		switch idx {
 		case _station:
 			uri = fmt.Sprintf("%sstations/track/%s/%s", IE.baseURL, user, title)
 		case _playlist:
@@ -143,6 +148,7 @@ func parseURL(u url.URL) *scURL {
 		case _user:
 			uri = fmt.Sprintf("%s%s", IE.baseURL, user)
 		case _song:
+			// pretty sure its never happened, but still..
 			if (user == "stations") || (title == "sets") {
 				log.Println("take a look into [soundcloud.go] parseUrl()")
 				continue
@@ -152,7 +158,7 @@ func parseURL(u url.URL) *scURL {
 		sc := scURL{
 			title:  title,
 			user:   user,
-			kind:   urlKind(t),
+			kind:   idx,
 			secret: secret,
 			url:    uri,
 		}
