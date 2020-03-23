@@ -4,7 +4,6 @@ import (
 	"net/url"
 	"regexp"
 
-	"github.com/camelva/erzo/engine"
 	"github.com/camelva/erzo/parsers"
 )
 
@@ -17,12 +16,16 @@ type Extractor struct {
 var IE Extractor
 
 func init() {
-	IE = Extractor{
-		urlPattern: `(?:www\.)?(?:youtube\.com|youtu.be)`,
-		apiURL:     "https://api.soundcloud.com/",
-		baseURL:    "https://youtube.com/",
-	}
-	engine.AddExtractor(IE)
+	// temporary disable parser
+	//
+	return
+	//
+	//IE = Extractor{
+	//	urlPattern: `(?:www\.)?(?:youtube\.com|youtu.be)`,
+	//	apiURL:     "https://api.soundcloud.com/",
+	//	baseURL:    "https://youtube.com/",
+	//}
+	//engine.AddExtractor(IE)
 }
 
 func (ie Extractor) Compatible(u url.URL) bool {
