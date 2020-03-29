@@ -80,24 +80,24 @@ func (formats *Formats) Sort() {
 }
 
 type ExtractorInfo struct {
-	ID           int
-	Permalink    string
-	Uploader     string
-	UploaderID   int
-	UploaderURL  string
-	Timestamp    time.Time
-	Title        string
-	Description  string
-	Thumbnails   []Artwork
-	Duration     float32
-	WebPageURL   string
-	License      string
-	ViewCount    int
-	LikeCount    int
-	CommentCount int
-	RepostCount  int
-	Genre        string
-	Formats      Formats
+	ID        int
+	Permalink string
+	Uploader  string
+	//UploaderID   int
+	//UploaderURL  string
+	Timestamp   time.Time
+	Title       string
+	Description string
+	Thumbnails  map[string]Artwork
+	Duration    float32
+	WebPageURL  string
+	//License      string
+	//ViewCount    int
+	//LikeCount    int
+	//CommentCount int
+	//RepostCount  int
+	Genre   string
+	Formats Formats
 }
 
 type Transcodinger interface {

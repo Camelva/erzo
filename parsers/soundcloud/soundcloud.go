@@ -200,24 +200,24 @@ func extractInfo(info *metadata2) (*parsers.ExtractorInfo, error) {
 	thumbnails := extractArtworks(info.ArtworkURL, info.User.AvatarURL)
 
 	var ExtractedInfo = &parsers.ExtractorInfo{
-		ID:           info.ID,
-		Permalink:    info.Permalink,
-		Uploader:     info.User.Username,
-		UploaderID:   info.User.ID,
-		UploaderURL:  info.User.PermalinkURL,
-		Timestamp:    info.CreatedAt,
-		Title:        info.Title,
-		Description:  info.Description,
-		Thumbnails:   thumbnails,
-		Duration:     duration,
-		WebPageURL:   info.PermalinkURL,
-		License:      info.License,
-		ViewCount:    info.PlaybackCount,
-		LikeCount:    info.LikesCount,
-		CommentCount: info.CommentCount,
-		RepostCount:  info.RepostsCount,
-		Genre:        info.Genre,
-		Formats:      formats,
+		ID:        info.ID,
+		Permalink: info.Permalink,
+		Uploader:  info.User.Username,
+		//UploaderID:   info.User.ID,
+		//UploaderURL:  info.User.PermalinkURL,
+		Timestamp:   info.CreatedAt,
+		Title:       info.Title,
+		Description: info.Description,
+		Thumbnails:  thumbnails,
+		Duration:    duration,
+		WebPageURL:  info.PermalinkURL,
+		//License:      info.License,
+		//ViewCount:    info.PlaybackCount,
+		//LikeCount:    info.LikesCount,
+		//CommentCount: info.CommentCount,
+		//RepostCount:  info.RepostsCount,
+		Genre:   info.Genre,
+		Formats: formats,
 	}
 
 	return ExtractedInfo, nil
@@ -279,7 +279,7 @@ func (transcodings transcodings) extractFormats() (parsers.Formats, error) {
 	return formats, nil
 }
 
-func extractArtworks(artwork string, avatar string) []parsers.Artwork {
+func extractArtworks(artwork string, avatar string) map[string]parsers.Artwork {
 	artworksMap := map[string]int{
 		"mini":     16,
 		"tiny":     20,
@@ -296,7 +296,7 @@ func extractArtworks(artwork string, avatar string) []parsers.Artwork {
 		artwork = avatar
 	}
 
-	artworks := make([]parsers.Artwork, 0)
+	artworks := make(map[string]parsers.Artwork, 0)
 
 	re := regexp.MustCompile(`-([0-9a-z]+)\.jpg`)
 	if !re.MatchString(artwork) {
@@ -312,7 +312,7 @@ func extractArtworks(artwork string, avatar string) []parsers.Artwork {
 			URL:  newURL,
 			Size: artSize,
 		}
-		artworks = append(artworks, i)
+		artworks[artType] = i
 	}
 
 	return artworks
