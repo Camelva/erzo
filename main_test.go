@@ -37,9 +37,21 @@ func TestGet(t *testing.T) {
 			false,
 		},
 		{
+			"Another song",
+			args{"https://soundcloud.com/erynmartin/homie-wonderland-1"},
+			path.Join(outFolder, "homie-wonderland-1.mp3"),
+			false,
+		},
+		{
 			"SoundCloud only url #2",
 			args{"https://soundcloud.com/ynwmelly/suicidal-ft-juice-wrld-remix"},
 			path.Join(outFolder, "suicidal-ft-juice-wrld-remix.mp3"),
+			false,
+		},
+		{
+			"SoundCloud share from album",
+			args{"https://soundcloud.com/iamtrevordaniel/falling?in=iamtrevordaniel/sets/homesick"},
+			path.Join(outFolder, "falling.mp3"),
 			false,
 		},
 		{
