@@ -4,6 +4,7 @@ import (
 	"github.com/camelva/erzo/engine"
 	"github.com/camelva/erzo/parsers"
 	"net/url"
+	"os"
 	"os/exec"
 )
 
@@ -30,20 +31,45 @@ func (l loader) Name() string {
 func (l loader) Bin() string {
 	return l.bin
 }
-func (l loader) Get(u *url.URL, outName string) error {
-	_, err := execute(
-		l.Bin(),
-		"-y", // overwrite existing files
-		"-i",
-		u.String(),
-		"-c",
-		"copy",
-		outName,
-		//"-report", // only for debug
-	)
+func (l loader) Get(u *url.URL, outName string, metadata []string) error {
+	args := make([]string, 0)
+	args = append(args,
+		"-y",             // overwrite existing
+		"-i", u.String(), // input file
+		"-c", "copy")
+	// metadata
+	for _, el := range metadata {
+		args = append(args, "-metadata", el)
+	}
+	args = append(args, outName) // output name should always be latest element
+	// if need debug
+	// args = append(args, "-report")
+	_, err := execute(l.Bin(), args...)
 	if err != nil {
 		return err
 	}
+	return nil
+}
+func (l loader) AddThumbnail(filename string, thumb string) error {
+	tempName := "temp.mp3"
+	args := make([]string, 0)
+	args = append(args,
+		"-y",           // overwrite existing
+		"-i", filename, // input file
+		"-i", thumb,
+		//"-vn",
+		"-id3v2_version", "3",
+		"-c", "copy",
+		"-map", "0", "-map", "1",
+		"-metadata:s:v", "title=Album cover",
+		"-metadata:s:v", "comment=Cover (front)",
+		tempName)
+	//args = append(args, "-report")
+	_, err := execute(l.Bin(), args...)
+	if err != nil {
+		return err
+	}
+	_ = os.Rename(tempName, filename)
 	return nil
 }
 
@@ -68,8 +94,8 @@ func findBin() string {
 	return path
 }
 
-func execute(command ...string) ([]byte, error) {
-	cmd := exec.Command(command[0], command[1:]...)
+func execute(app string, args ...string) ([]byte, error) {
+	cmd := exec.Command(app, args...)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return out, err

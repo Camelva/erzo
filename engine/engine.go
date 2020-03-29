@@ -2,14 +2,16 @@ package engine
 
 import (
 	"fmt"
+	"github.com/camelva/erzo/loaders"
+	"github.com/camelva/erzo/parsers"
+	"github.com/camelva/erzo/utils"
 	"io/ioutil"
+	"log"
 	"net/url"
 	"os"
 	"path"
 	"regexp"
-
-	"github.com/camelva/erzo/loaders"
-	"github.com/camelva/erzo/parsers"
+	"strconv"
 )
 
 var _extractors []parsers.Extractor
@@ -120,7 +122,8 @@ func (e Engine) Process(s string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	title, err := e.downloadSong(info)
+	meta := createMetadata(info)
+	title, err := e.downloadSong(info, meta)
 	if err != nil {
 		return "", err
 	}
@@ -148,7 +151,7 @@ func (e Engine) extractInfo(u url.URL) (*parsers.ExtractorInfo, error) {
 	return nil, ErrUnsupportedService{Service: u.Hostname()}
 }
 
-func (e Engine) downloadSong(info *parsers.ExtractorInfo) (string, error) {
+func (e Engine) downloadSong(info *parsers.ExtractorInfo, metadata []string) (string, error) {
 	if _, err := ioutil.ReadDir(e.outputFolder); err != nil {
 		// outputFolder don't exist. Creating it...
 		if err := os.Mkdir(e.outputFolder, 0700); err != nil {
@@ -157,6 +160,17 @@ func (e Engine) downloadSong(info *parsers.ExtractorInfo) (string, error) {
 		}
 	}
 	outPath := makeFilePath(e.outputFolder, info.Permalink)
+	imageURL, err := url.Parse(info.Thumbnails["original"].URL)
+	var thumbnail string
+	if err == nil {
+		res, err := utils.Fetch(imageURL)
+		if err == nil {
+			thumbnail = path.Join(e.outputFolder, imageURL.Path)
+			if err := ioutil.WriteFile(thumbnail, res, 0644); err != nil {
+				thumbnail = ""
+			}
+		}
+	}
 	var downloadingErr error
 	for _, format := range info.Formats {
 		u, err := url.Parse(format.Url)
@@ -169,10 +183,16 @@ func (e Engine) downloadSong(info *parsers.ExtractorInfo) (string, error) {
 				// incompatible with loader, try another one
 				continue
 			}
-			if err := ldr.Get(u, outPath); err != nil {
+			if err := ldr.Get(u, outPath, metadata); err != nil {
 				// save err
 				downloadingErr = err
 				continue
+			}
+			if len(thumbnail) > 0 {
+				if err := ldr.AddThumbnail(outPath, thumbnail); err != nil {
+					log.Println(err)
+				}
+				_ = os.Remove(thumbnail)
 			}
 			return outPath, nil
 		}
@@ -181,6 +201,24 @@ func (e Engine) downloadSong(info *parsers.ExtractorInfo) (string, error) {
 		return "", ErrDownloadingError{Reason: downloadingErr.Error()}
 	}
 	return "", ErrUnsupportedProtocol{}
+}
+
+func createMetadata(info *parsers.ExtractorInfo) []string {
+	metaMap := map[string]string{
+		"title":        info.Title,
+		"album":        info.Title,
+		"genre":        info.Genre,
+		"artist":       info.Uploader,
+		"album_artist": info.Uploader,
+		"track":        strconv.Itoa(1),
+		"date":         strconv.Itoa(info.Timestamp.Year()),
+	}
+	var metadata = make([]string, 0, len(metaMap))
+	for key, value := range metaMap {
+		line := fmt.Sprintf("%s=%s", key, value)
+		metadata = append(metadata, line)
+	}
+	return metadata
 }
 
 func makeFilePath(folder string, title string) string {
