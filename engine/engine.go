@@ -183,10 +183,13 @@ func (e Engine) downloadSong(info *parsers.ExtractorInfo, metadata []string) (st
 				// incompatible with loader, try another one
 				continue
 			}
-			if err := ldr.Get(u, outPath, metadata); err != nil {
+			if err := ldr.Get(u, outPath); err != nil {
 				// save err
 				downloadingErr = err
 				continue
+			}
+			if err := ldr.UpdateTags(outPath, metadata); err != nil {
+				log.Println(err)
 			}
 			if len(thumbnail) > 0 {
 				if err := ldr.AddThumbnail(outPath, thumbnail); err != nil {

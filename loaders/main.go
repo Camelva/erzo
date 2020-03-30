@@ -10,6 +10,7 @@ type Loader interface {
 	Name() string
 	Bin() string
 	Compatible(format parsers.Format) bool
-	Get(*url.URL, string, []string) error
+	Get(*url.URL, string) error
+	UpdateTags(string, []string) error
 	AddThumbnail(string, string) error
 }

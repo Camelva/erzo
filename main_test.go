@@ -7,7 +7,7 @@ import (
 
 func TestGet(t *testing.T) {
 	var outFolder = "test_out"
-	var trunc = false
+	var trunc = true
 
 	type args struct {
 		message string
@@ -38,8 +38,8 @@ func TestGet(t *testing.T) {
 		},
 		{
 			"Another song",
-			args{"https://soundcloud.com/erynmartin/homie-wonderland-1"},
-			path.Join(outFolder, "homie-wonderland-1.mp3"),
+			args{"https://soundcloud.com/nybillion/sneaky-cats-live-jam-session"},
+			path.Join(outFolder, "sneaky-cats-live-jam-session.mp3"),
 			false,
 		},
 		{

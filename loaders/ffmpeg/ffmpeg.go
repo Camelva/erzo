@@ -31,20 +31,39 @@ func (l loader) Name() string {
 func (l loader) Bin() string {
 	return l.bin
 }
-func (l loader) Get(u *url.URL, outName string, metadata []string) error {
+func (l loader) Get(u *url.URL, outName string) error {
 	args := make([]string, 0)
 	args = append(args,
 		"-y",             // overwrite existing
 		"-i", u.String(), // input file
+		"-vn",
+		"-ar", "44100",
+		"-ac", "2",
+		"-b:a", "128k")
+	args = append(args, outName) // output name should always be latest element
+	// if need debug
+	//args = append(args, "-report")
+	_, err := execute(l.Bin(), args...)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+func (l loader) UpdateTags(filename string, metadata []string) error {
+	args := make([]string, 0)
+	args = append(args,
+		"-y",
+		"-i", filename,
 		"-c", "copy")
-	// metadata
 	for _, el := range metadata {
 		args = append(args, "-metadata", el)
 	}
-	args = append(args, outName) // output name should always be latest element
+	args = append(args, "temp.mp3") // output name should always be latest element
 	// if need debug
-	// args = append(args, "-report")
+	//args = append(args, "-report")
 	_, err := execute(l.Bin(), args...)
+	//noinspection GoUnhandledErrorResult
+	defer os.Rename("temp.mp3", filename)
 	if err != nil {
 		return err
 	}
