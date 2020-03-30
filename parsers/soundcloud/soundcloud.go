@@ -181,6 +181,7 @@ func resolve(link string) (*metadata2, error) {
 	if err := json.Unmarshal(res, &scMetadata); err != nil {
 		return nil, parsers.ErrCantContinue{Reason: "can't unmarshal fetched metadata"}
 	}
+	scMetadata.DownloadURL = fmt.Sprintf("%stracks/%d/download", IE.api2URL, scMetadata.ID)
 	return scMetadata, nil
 }
 
@@ -232,12 +233,20 @@ func (info *metadata2) getDownloadLink() (formats parsers.Formats, ok bool) {
 		// invalid url, just return false
 		return nil, false
 	}
-	q := dlURL.Query()
-	q.Set("client_id", IE.clientID)
-	query := q.Encode()
-	dlURL.RawQuery = query
+	res, err := fetch(dlURL)
+	if err != nil {
+		return nil, false
+	}
+	var realDlURL struct {
+		URL string `json:"redirectUri"`
+	}
+	if err = json.Unmarshal(res, &realDlURL); err != nil {
+		// invalid json, return false
+		return nil, false
+	}
+
 	format := parsers.Format{
-		Url:      dlURL.String(),
+		Url:      realDlURL.URL,
 		Ext:      "mp3",
 		Type:     "mpeg",
 		Protocol: "http",
