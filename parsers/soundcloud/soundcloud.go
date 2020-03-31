@@ -89,7 +89,7 @@ func (ie extractor) Extract(u url.URL) (*parsers.ExtractorInfo, error) {
 		return nil, parsers.ErrFormatNotSupported{Format: sc.kind.String()}
 	}
 	metadata, err := resolve(sc.url)
-	if err != nil || metadata == nil {
+	if err != nil || (metadata == &metadata2{}) {
 		return nil, parsers.ErrCantContinue{Reason: "can't get song metadata"}
 	}
 	info, err := extractInfo(metadata)
@@ -174,7 +174,8 @@ func resolve(link string) (*metadata2, error) {
 		return nil, parsers.ErrCantContinue{Reason: fmt.Sprintf("can't parse url: %s", uri)}
 	}
 	res, err := fetch(resolveURL)
-	if err != nil {
+	// empty json object "{}"
+	if err != nil || (len(res) < 3) {
 		return nil, parsers.ErrCantContinue{Reason: "can't fetch resolve url"}
 	}
 	var scMetadata = new(metadata2)
