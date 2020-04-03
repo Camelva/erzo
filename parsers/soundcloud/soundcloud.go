@@ -155,6 +155,9 @@ func parseURL(u url.URL) *scURL {
 			}
 			uri = fmt.Sprintf("%s%s/%s", IE.baseURL, user, title)
 		}
+		if secret != "" {
+			uri = fmt.Sprintf("%s/%s", uri, secret)
+		}
 		sc := scURL{
 			title:  title,
 			user:   user,
