@@ -74,3 +74,37 @@ func TestGet(t *testing.T) {
 		})
 	}
 }
+
+func TestGetDebug(t *testing.T) {
+	var outFolder = "test_out"
+	var trunc = true
+
+	type args struct {
+		message string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    string
+		wantErr bool
+	}{
+		{
+			"SoundCloud only url",
+			args{"https://soundcloud.com/user867574303/kurs-mind-detox-20-meditatsiya-1/s-fgHTh"},
+			path.Join(outFolder, "kurs-mind-detox-20-meditatsiya-1.mp3"),
+			false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := Get(tt.args.message, Output(outFolder), Truncate(trunc))
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Get() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("Get() got = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
