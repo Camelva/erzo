@@ -8,6 +8,7 @@ import (
 )
 
 type Extractor struct {
+	name       string
 	urlPattern string
 	apiURL     string
 	baseURL    string
@@ -26,6 +27,10 @@ func init() {
 	//	baseURL:    "https://youtube.com/",
 	//}
 	//engine.AddExtractor(IE)
+}
+
+func (ie Extractor) Name() string {
+	return ie.name
 }
 
 func (ie Extractor) Compatible(u url.URL) bool {

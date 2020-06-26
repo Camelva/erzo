@@ -1,7 +1,9 @@
 package erzo
 
 import (
+	"net/url"
 	"path"
+	"reflect"
 	"testing"
 )
 
@@ -63,7 +65,8 @@ func TestGet(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := Get(tt.args.message, Output(outFolder), Truncate(trunc))
+			got, meta, err := Get(tt.args.message, OptionOutput(outFolder), OptionTruncate(trunc))
+			_ = meta
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Get() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -97,13 +100,58 @@ func TestGetDebug(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := Get(tt.args.message, Output(outFolder), Truncate(trunc))
+			got, meta, err := Get(tt.args.message, OptionOutput(outFolder), OptionTruncate(trunc))
+			_ = meta
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Get() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if got != tt.want {
 				t.Errorf("Get() got = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestCheckURL(t *testing.T) {
+	type args struct {
+		msg string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    TidyURL
+		wantErr bool
+	}{
+		{
+			name:    "string",
+			args:    args{msg: "some test string"},
+			want:    TidyURL{},
+			wantErr: true,
+		},
+		{
+			name: "url",
+			args: args{msg: "https://soundcloud.com/whenzz/4-u"},
+			want: TidyURL{
+				URL: url.URL{
+					Scheme: "https",
+					Host:   "soundcloud.com",
+					Path:   "/whenzz/4-u",
+				},
+				Service: "SoundCloud",
+			},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := CheckURL(tt.args.msg)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("CheckURL() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("CheckURL() got = %v, want %v", got, tt.want)
 			}
 		})
 	}
