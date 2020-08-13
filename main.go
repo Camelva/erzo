@@ -2,11 +2,8 @@ package erzo
 
 import (
 	"github.com/camelva/erzo/engine"
-
 	_ "github.com/camelva/erzo/loaders/ffmpeg"
-
 	_ "github.com/camelva/erzo/parsers/soundcloud"
-	_ "github.com/camelva/erzo/parsers/youtube"
 )
 
 type ErrNotURL struct {
@@ -85,26 +82,31 @@ func Get(message string, opts ...Option) (*engine.SongResult, error) {
 	)
 	r, err := e.Process(message)
 	if err != nil {
-		var convertedErr error
-		switch err.(type) {
-		case engine.ErrNotURL:
-			convertedErr = ErrNotURL{err.(engine.ErrNotURL)}
-		case engine.ErrUnsupportedService:
-			convertedErr = ErrUnsupportedService{err.(engine.ErrUnsupportedService)}
-		case engine.ErrUnsupportedType:
-			convertedErr = ErrUnsupportedType{err.(engine.ErrUnsupportedType)}
-		case engine.ErrCantFetchInfo:
-			convertedErr = ErrCantFetchInfo{err.(engine.ErrCantFetchInfo)}
-		case engine.ErrUnsupportedProtocol:
-			convertedErr = ErrUnsupportedProtocol{err.(engine.ErrUnsupportedProtocol)}
-		case engine.ErrDownloadingError:
-			convertedErr = ErrDownloadingError{err.(engine.ErrDownloadingError)}
-		case engine.ErrUndefined:
-			convertedErr = ErrUndefined{err.(engine.ErrUndefined)}
-		default:
-			convertedErr = ErrUndefined{engine.ErrUndefined{}}
-		}
+		convertedErr := convertErr(err)
 		return nil, convertedErr
 	}
 	return r, nil
+}
+
+func convertErr(err error) error {
+	var convertedErr error
+	switch err.(type) {
+	case engine.ErrNotURL:
+		convertedErr = ErrNotURL{err.(engine.ErrNotURL)}
+	case engine.ErrUnsupportedService:
+		convertedErr = ErrUnsupportedService{err.(engine.ErrUnsupportedService)}
+	case engine.ErrUnsupportedType:
+		convertedErr = ErrUnsupportedType{err.(engine.ErrUnsupportedType)}
+	case engine.ErrCantFetchInfo:
+		convertedErr = ErrCantFetchInfo{err.(engine.ErrCantFetchInfo)}
+	case engine.ErrUnsupportedProtocol:
+		convertedErr = ErrUnsupportedProtocol{err.(engine.ErrUnsupportedProtocol)}
+	case engine.ErrDownloadingError:
+		convertedErr = ErrDownloadingError{err.(engine.ErrDownloadingError)}
+	case engine.ErrUndefined:
+		convertedErr = ErrUndefined{err.(engine.ErrUndefined)}
+	default:
+		convertedErr = ErrUndefined{engine.ErrUndefined{}}
+	}
+	return convertedErr
 }

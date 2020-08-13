@@ -15,8 +15,8 @@ import (
 	"time"
 )
 
-var _extractors []parsers.Extractor
-var _loaders []loaders.Loader
+var _extractors = map[string]parsers.Extractor{}
+var _loaders = map[string]loaders.Loader{}
 
 const (
 	_urlPattern = `((?:[a-z]{3,6}:\/\/)|(?:^|\s))` +
@@ -80,27 +80,40 @@ func (e ErrDownloadingError) Error() string {
 }
 
 func AddExtractor(x parsers.Extractor) {
-	_extractors = append(_extractors, x)
+	name := x.Name()
+	_extractors[name] = x
+	//_extractors = append(_extractors, x)
 }
+func Extractors() map[string]parsers.Extractor {
+	return _extractors
+}
+
 func AddLoader(l loaders.Loader) {
-	_loaders = append(_loaders, l)
+	name := l.Name()
+	_loaders[name] = l
+	//_loaders = append(_loaders, l)
+}
+func Loaders() map[string]loaders.Loader {
+	return _loaders
 }
 
 type Engine struct {
-	extractors   []parsers.Extractor
-	loaders      []loaders.Loader
+	extractors   map[string]parsers.Extractor
+	loaders      map[string]loaders.Loader
 	outputFolder string
 }
 
 // New return new instance of Engine
 func New(out string, truncate bool) *Engine {
-	if (len(_extractors) < 1) || (len(_loaders) < 1) {
+	xtrs := Extractors()
+	ldrs := Loaders()
+	if (len(xtrs) < 1) || (len(ldrs) < 1) {
 		// we need at least 1 extractor and 1 loader for work
 		return nil
 	}
 	e := &Engine{
-		extractors:   _extractors,
-		loaders:      _loaders,
+		extractors:   xtrs,
+		loaders:      ldrs,
 		outputFolder: out,
 	}
 	if truncate {
@@ -109,9 +122,15 @@ func New(out string, truncate bool) *Engine {
 	return e
 }
 
+type SongMetadata struct {
+	Artist, Title, Album, Thumbnail string
+	Date                            time.Time
+	Duration                        float32
+}
+
 // Clean current e.OutputFolder directory
 func (e Engine) Clean() {
-	os.RemoveAll(e.outputFolder)
+	_ = os.RemoveAll(e.outputFolder)
 	return
 }
 
@@ -124,7 +143,7 @@ func (e Engine) Clean() {
 // ErrDownloadingError if fatal error occurred while downloading song
 // ErrUndefined any other errors
 func (e Engine) Process(s string) (*SongResult, error) {
-	u, ok := extractURL(s)
+	u, ok := ExtractURL(s)
 	if !ok {
 		return nil, ErrNotURL{}
 	}
@@ -227,7 +246,7 @@ func createMetadata(info *parsers.ExtractorInfo) []string {
 	metaMap := map[string]string{
 		"title": info.Title,
 		"album": info.Title,
-		//"genre":        info.Genre,
+		//"genre":      info.Genre,
 		"artist":       info.Uploader,
 		"album_artist": info.Uploader,
 		"track":        strconv.Itoa(1),
@@ -251,8 +270,8 @@ func makeFilePath(folder string, title string) string {
 	return outPath
 }
 
-// extractURL trying to extract url from message
-func extractURL(message string) (u *url.URL, ok bool) {
+// ExtractURL trying to extract url from message
+func ExtractURL(message string) (u *url.URL, ok bool) {
 	re := regexp.MustCompile(_urlPattern)
 	rawURL := re.FindString(message)
 	if len(rawURL) < 1 {
