@@ -4,6 +4,7 @@ import (
 	"github.com/camelva/erzo/engine"
 	_ "github.com/camelva/erzo/loaders/ffmpeg"
 	_ "github.com/camelva/erzo/parsers/soundcloud"
+	_ "github.com/camelva/erzo/parsers/youtube"
 )
 
 // Get process given url and download song from it.
