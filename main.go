@@ -2,8 +2,11 @@ package erzo
 
 import (
 	"github.com/camelva/erzo/engine"
+
 	_ "github.com/camelva/erzo/loaders/ffmpeg"
+
 	_ "github.com/camelva/erzo/parsers/soundcloud"
+	_ "github.com/camelva/erzo/parsers/youtube"
 )
 
 type ErrNotURL struct {
@@ -68,7 +71,7 @@ func Output(s string) Option {
 // ErrUnsupportedProtocol if there is no downloader for this format
 // ErrDownloadingError if fatal error occurred while downloading song
 // ErrUndefined any other errors
-func Get(message string, opts ...Option) (string, error) {
+func Get(message string, opts ...Option) (*engine.SongResult, error) {
 	options := options{
 		output:   "out",
 		truncate: false,
@@ -101,7 +104,7 @@ func Get(message string, opts ...Option) (string, error) {
 		default:
 			convertedErr = ErrUndefined{engine.ErrUndefined{}}
 		}
-		return "", convertedErr
+		return nil, convertedErr
 	}
 	return r, nil
 }

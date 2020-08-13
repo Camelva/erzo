@@ -12,6 +12,7 @@ import (
 	"path"
 	"regexp"
 	"strconv"
+	"time"
 )
 
 var _extractors []parsers.Extractor
@@ -22,6 +23,15 @@ const (
 		`((?:[a-zA-Z0-9\-]+\.)+[a-z]{2,13})` +
 		`([\.\?\=\&\%\/\w\-]*\b)`
 )
+
+type SongResult struct {
+	Path       string
+	Author     string
+	Title      string
+	Thumbnails map[string]parsers.Artwork
+	Duration   time.Duration
+	UploadDate time.Time
+}
 
 type ErrNotURL struct{}
 
@@ -113,21 +123,28 @@ func (e Engine) Clean() {
 // ErrUnsupportedProtocol if there is no downloader for this format
 // ErrDownloadingError if fatal error occurred while downloading song
 // ErrUndefined any other errors
-func (e Engine) Process(s string) (string, error) {
+func (e Engine) Process(s string) (*SongResult, error) {
 	u, ok := extractURL(s)
 	if !ok {
-		return "", ErrNotURL{}
+		return nil, ErrNotURL{}
 	}
 	info, err := e.extractInfo(*u)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	meta := createMetadata(info)
-	title, err := e.downloadSong(info, meta)
+	filePath, err := e.downloadSong(info, meta)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return title, nil
+	return &SongResult{
+		Path:       filePath,
+		Author:     info.Uploader,
+		Title:      info.Title,
+		Thumbnails: info.Thumbnails,
+		Duration:   info.Duration,
+		UploadDate: info.Timestamp,
+	}, nil
 }
 
 func (e Engine) extractInfo(u url.URL) (*parsers.ExtractorInfo, error) {
@@ -208,9 +225,9 @@ func (e Engine) downloadSong(info *parsers.ExtractorInfo, metadata []string) (st
 
 func createMetadata(info *parsers.ExtractorInfo) []string {
 	metaMap := map[string]string{
-		"title":        info.Title,
-		"album":        info.Title,
-		"genre":        info.Genre,
+		"title": info.Title,
+		"album": info.Title,
+		//"genre":        info.Genre,
 		"artist":       info.Uploader,
 		"album_artist": info.Uploader,
 		"track":        strconv.Itoa(1),
