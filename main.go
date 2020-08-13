@@ -6,55 +6,6 @@ import (
 	_ "github.com/camelva/erzo/parsers/soundcloud"
 )
 
-type ErrNotURL struct {
-	engine.ErrNotURL
-}
-type ErrUnsupportedService struct {
-	engine.ErrUnsupportedService
-}
-type ErrUnsupportedType struct {
-	engine.ErrUnsupportedType
-}
-type ErrCantFetchInfo struct {
-	engine.ErrCantFetchInfo
-}
-type ErrUnsupportedProtocol struct {
-	engine.ErrUnsupportedProtocol
-}
-type ErrDownloadingError struct {
-	engine.ErrDownloadingError
-}
-type ErrUndefined struct {
-	engine.ErrUndefined
-}
-
-type options struct {
-	output   string
-	truncate bool
-}
-
-type Option interface {
-	apply(*options)
-}
-
-type truncateOption bool
-
-func (opt truncateOption) apply(opts *options) {
-	opts.truncate = bool(opt)
-}
-func Truncate(b bool) Option {
-	return truncateOption(b)
-}
-
-type outputOption string
-
-func (opt outputOption) apply(opts *options) {
-	opts.output = string(opt)
-}
-func Output(s string) Option {
-	return outputOption(s)
-}
-
 // Get process given url and download song from it.
 // @message - url to process
 // @options:

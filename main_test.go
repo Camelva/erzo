@@ -122,7 +122,7 @@ func TestGetDebug(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := Get(tt.args.message, Output(outFolder), Truncate(trunc))
+			got, err := Get(tt.args.message, OptionOutput(outFolder), OptionTruncate(trunc))
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Get() error = %v, wantErr %v", err, tt.wantErr)
 				return
