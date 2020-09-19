@@ -20,8 +20,8 @@ import (
 // ErrUnsupportedProtocol if there is no downloader for this format
 // ErrDownloadingError if fatal error occurred while downloading song
 // ErrUndefined any other errors
-func Get(message string, opts ...Option) (*engine.SongResult, error) {
-	song, err := GetInfo(message, opts...)
+func Get(message string, setters ...Option) (*engine.SongResult, error) {
+	song, err := GetInfo(message, setters...)
 	if err != nil {
 		return nil, err
 	}
@@ -32,17 +32,21 @@ func Get(message string, opts ...Option) (*engine.SongResult, error) {
 	return songRes, nil
 }
 
-func GetInfo(message string, opts ...Option) (*engine.SongInfo, error) {
-	options := options{
-		output:   "out",
-		truncate: false,
+func GetInfo(message string, setters ...Option) (*engine.SongInfo, error) {
+	args := Options{
+		Debug:      false,
+		Output:     "out",
+		Truncate:   false,
+		HTTPClient: nil,
 	}
-	for _, o := range opts {
-		o.apply(&options)
+	for _, setter := range setters {
+		setter(&args)
 	}
 	e := engine.New(
-		options.output,
-		options.truncate,
+		args.Output,
+		args.Truncate,
+		args.Debug,
+		args.HTTPClient,
 	)
 	song, err := e.GetInfo(message)
 	if err != nil {

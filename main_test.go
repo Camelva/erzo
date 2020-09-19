@@ -2,6 +2,7 @@ package erzo
 
 import (
 	"github.com/camelva/erzo/engine"
+	"net/http"
 	"path"
 	"testing"
 	"time"
@@ -10,6 +11,8 @@ import (
 func TestGet(t *testing.T) {
 	var outFolder = "test_out"
 	var trunc = true
+	var client *http.Client = nil
+	var debug = false
 	var dateLayout = "2006-01-02"
 
 	dur3, _ := time.ParseDuration("2m32s")
@@ -122,7 +125,7 @@ func TestGet(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := Get(tt.args.message, OptionOutput(outFolder), OptionTruncate(trunc))
+			got, err := Get(tt.args.message, Output(outFolder), Truncate(trunc), Debug(debug), WithHTTPClient(client))
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Get() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -148,48 +151,6 @@ func TestGet(t *testing.T) {
 			if got.UploadDate != tt.want.UploadDate {
 				t.Errorf("Get() got = %v, want %v", got.UploadDate, tt.want.UploadDate)
 			}
-		})
-	}
-}
-
-func TestGetInfoDebug(t *testing.T) {
-	tests := []struct {
-		name    string
-		message string
-		wantErr bool
-	}{
-		{"first", "https://youtu.be/CPmuDfD8VI8", false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := GetInfo(tt.message, OptionOutput("debug"), OptionTruncate(true))
-			if (err != nil) != tt.wantErr {
-				t.Errorf("GetInfo() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			t.Logf("GetInfo() result = %#v", got)
-		})
-	}
-}
-
-func TestGetDebug(t *testing.T) {
-	tests := []struct {
-		name    string
-		message string
-		wantErr bool
-	}{
-		{"first", "https://youtu.be/CPmuDfD8VI8", false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := Get(tt.message, OptionOutput("debug"), OptionTruncate(true))
-			if (err != nil) != tt.wantErr {
-				t.Errorf("GetInfo() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			t.Logf("GetInfo() result = %#v", got)
 		})
 	}
 }

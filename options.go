@@ -1,41 +1,36 @@
 package erzo
 
-type options struct {
-	output   string
-	truncate bool
-	//metadata bool
+import "net/http"
+
+type Options struct {
+	Debug      bool
+	Output     string
+	Truncate   bool
+	HTTPClient *http.Client
 }
 
-type Option interface {
-	apply(*options)
+type Option func(*Options)
+
+func Debug(debug bool) Option {
+	return func(args *Options) {
+		args.Debug = debug
+	}
 }
 
-type truncateOption bool
-
-func (opt truncateOption) apply(opts *options) {
-	opts.truncate = bool(opt)
+func Truncate(truncate bool) Option {
+	return func(args *Options) {
+		args.Truncate = truncate
+	}
 }
 
-func OptionTruncate(b bool) Option {
-	return truncateOption(b)
+func Output(path string) Option {
+	return func(args *Options) {
+		args.Output = path
+	}
 }
 
-type outputOption string
-
-func (opt outputOption) apply(opts *options) {
-	opts.output = string(opt)
+func WithHTTPClient(client *http.Client) Option {
+	return func(args *Options) {
+		args.HTTPClient = client
+	}
 }
-
-func OptionOutput(s string) Option {
-	return outputOption(s)
-}
-
-//type metadataOption bool
-//
-//func (opt metadataOption) apply(opts *options) {
-//	opts.metadata = bool(opt)
-//}
-//
-//func OptionMetadata(b bool) Option {
-//	return metadataOption(b)
-//}

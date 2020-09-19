@@ -1,16 +1,16 @@
 package parsers
 
 import (
+	"net/http"
 	"net/url"
-	"regexp"
 	"sort"
 	"time"
 )
 
 type Extractor interface {
 	Name() string
-	Extract(url.URL) (*ExtractorInfo, error)
-	Compatible(url.URL) bool
+	Extract(*url.URL, bool, *http.Client) (*ExtractorInfo, error)
+	Compatible(*url.URL) bool
 }
 
 type Format struct {
@@ -23,19 +23,20 @@ type Format struct {
 
 type Formats []Format
 
-func (formats *Formats) Add(t Transcodinger) {
-	re := regexp.MustCompile(`_`)
-	ext := re.Split(t.GetPreset(), -1)[0]
-	re = regexp.MustCompile(`audio/([\w-]+)[;]?`)
-	mimeType := re.FindStringSubmatch(t.GetMimeType())[1]
-	f := Format{
-		Url:      t.GetURL(),
-		Type:     mimeType,
-		Protocol: t.GetProtocol(),
-		Ext:      ext,
-	}
-	*formats = append(*formats, f)
-}
+//func (formats *Formats) Add(t Transcodinger) {
+//	re := regexp.MustCompile(`_`)
+//	ext := re.Split(t.GetPreset(), -1)[0]
+//	re = regexp.MustCompile(`audio/([\w-]+)[;]?`)
+//	mimeType := re.FindStringSubmatch(t.GetMimeType())[1]
+//	f := Format{
+//		Url:      t.GetURL(),
+//		Type:     mimeType,
+//		Protocol: t.GetProtocol(),
+//		Ext:      ext,
+//	}
+//	*formats = append(*formats, f)
+//}
+
 func (formats *Formats) Sort() {
 	formatsCopy := make(Formats, len(*formats))
 	copy(formatsCopy, *formats)
@@ -84,12 +85,12 @@ type ExtractorInfo struct {
 	Formats Formats
 }
 
-type Transcodinger interface {
-	GetURL() string
-	GetPreset() string
-	GetProtocol() string
-	GetMimeType() string
-}
+//type Transcodinger interface {
+//	GetURL() string
+//	GetPreset() string
+//	GetProtocol() string
+//	GetMimeType() string
+//}
 
 type Artwork struct {
 	Type string

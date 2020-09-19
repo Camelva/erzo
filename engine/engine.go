@@ -7,6 +7,7 @@ import (
 	"github.com/camelva/erzo/utils"
 	"io/ioutil"
 	"log"
+	"net/http"
 	"net/url"
 	"os"
 	"path"
@@ -53,7 +54,6 @@ func Extractors() map[string]parsers.Extractor {
 func AddLoader(l loaders.Loader) {
 	name := l.Name()
 	_loaders[name] = l
-	//_loaders = append(_loaders, l)
 }
 func Loaders() map[string]loaders.Loader {
 	return _loaders
@@ -63,10 +63,12 @@ type Engine struct {
 	extractors   map[string]parsers.Extractor
 	loaders      map[string]loaders.Loader
 	outputFolder string
+	debug        bool
+	httpClient   *http.Client
 }
 
 // New return new instance of Engine
-func New(out string, truncate bool) *Engine {
+func New(out string, truncate bool, debug bool, client *http.Client) *Engine {
 	xtrs := Extractors()
 	ldrs := Loaders()
 	if (len(xtrs) < 1) || (len(ldrs) < 1) {
@@ -77,6 +79,8 @@ func New(out string, truncate bool) *Engine {
 		extractors:   xtrs,
 		loaders:      ldrs,
 		outputFolder: out,
+		debug:        debug,
+		httpClient:   client,
 	}
 	if truncate {
 		e.Clean()
@@ -111,7 +115,7 @@ func (e Engine) GetInfo(s string) (*SongInfo, error) {
 	if !ok {
 		return nil, ErrNotURL{}
 	}
-	info, err := e.extractInfo(*u)
+	info, err := e.extractInfo(u)
 	if err != nil {
 		return nil, err
 	}
@@ -143,18 +147,18 @@ func (s *SongInfo) Get() (*SongResult, error) {
 	}, nil
 }
 
-func (e Engine) extractInfo(u url.URL) (*parsers.ExtractorInfo, error) {
+func (e Engine) extractInfo(u *url.URL) (*parsers.ExtractorInfo, error) {
 	for _, xtr := range e.extractors {
 		if !xtr.Compatible(u) {
 			continue
 		}
-		info, err := xtr.Extract(u)
+		info, err := xtr.Extract(u, e.debug, e.httpClient)
 		if err != nil {
 			switch err.(type) {
 			case parsers.ErrFormatNotSupported:
 				return nil, ErrUnsupportedType{err.(parsers.ErrFormatNotSupported)}
 			case parsers.ErrCantContinue:
-				return nil, ErrDownloadingError{err.Error()}
+				return nil, ErrDownloadingError(err.Error())
 			default:
 				return nil, ErrUndefined{}
 			}
@@ -214,16 +218,15 @@ func (e Engine) downloadSong(info *parsers.ExtractorInfo, metadata []string) (st
 		}
 	}
 	if downloadingErr != nil {
-		return "", ErrDownloadingError{Reason: downloadingErr.Error()}
+		return "", ErrDownloadingError(downloadingErr.Error())
 	}
-	return "", ErrUnsupportedProtocol{}
+	return "", ErrUnsupportedProtocol("undefined")
 }
 
 func createMetadata(info *parsers.ExtractorInfo) []string {
 	metaMap := map[string]string{
-		"title": info.Title,
-		"album": info.Title,
-		//"genre":      info.Genre,
+		"title":        info.Title,
+		"album":        info.Title,
 		"artist":       info.Uploader,
 		"album_artist": info.Uploader,
 		"track":        strconv.Itoa(1),

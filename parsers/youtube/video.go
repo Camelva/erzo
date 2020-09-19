@@ -116,8 +116,7 @@ func parseStreams(prData PlayerResponseData) ([]Stream, error) {
 
 	filterFormat := func(stream Stream) {
 		if stream.MimeType == "" {
-			// FIXME logging
-			log.Printf("An error occurred while decoding one of the video's Stream's information: Stream %+v", stream)
+			log.Printf("An error occurred while decoding Stream's information: Stream %+v", stream)
 			return
 		}
 		streams = append(streams, stream)

@@ -5,6 +5,8 @@ import (
 	"github.com/camelva/erzo/parsers"
 )
 
+//var ErrNotURL = "there is no valid url"
+
 type ErrNotURL struct{}
 
 func (ErrNotURL) Error() string {
@@ -35,18 +37,14 @@ type ErrCantFetchInfo struct {
 }
 
 // loaders errors
-type ErrUnsupportedProtocol struct {
-	Protocol string
+type ErrUnsupportedProtocol string
+
+func (err ErrUnsupportedProtocol) Error() string {
+	return fmt.Sprintf("available loaders can't work with protocol: %s", err)
 }
 
-func (ErrUnsupportedProtocol) Error() string {
-	return "current loaders don't work with this protocol"
-}
+type ErrDownloadingError string
 
-type ErrDownloadingError struct {
-	Reason string
-}
-
-func (e ErrDownloadingError) Error() string {
-	return fmt.Sprintf("can't download this song: %s", e.Reason)
+func (err ErrDownloadingError) Error() string {
+	return fmt.Sprintf("can't download: %s", err)
 }

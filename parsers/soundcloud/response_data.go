@@ -166,10 +166,10 @@ type transcoding struct {
 	Quality string `json:"quality"`
 }
 
-func (t transcoding) GetURL() string      { return t.URL }
-func (t transcoding) GetPreset() string   { return t.Preset }
-func (t transcoding) GetProtocol() string { return t.Format.Protocol }
-func (t transcoding) GetMimeType() string { return t.Format.MimeType }
+//func (t transcoding) GetURL() string      { return t.URL }
+//func (t transcoding) GetPreset() string   { return t.Preset }
+//func (t transcoding) GetProtocol() string { return t.Format.Protocol }
+//func (t transcoding) GetMimeType() string { return t.Format.MimeType }
 
 type publisher struct {
 	Urn           string `json:"urn"`

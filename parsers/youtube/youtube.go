@@ -3,6 +3,7 @@ package youtube
 import (
 	"github.com/camelva/erzo/engine"
 	"github.com/camelva/erzo/parsers"
+	"net/http"
 	"net/url"
 	"regexp"
 )
@@ -10,19 +11,12 @@ import (
 type Extractor struct {
 	name       string
 	urlPattern string
-	apiURL     string
-	baseURL    string
 }
 
-var IE Extractor
-
-var audioITags = []int{251, 250, 249, 172, 171, 328, 325, 258, 256, 141, 140, 139}
-
 func init() {
-	IE = Extractor{
+	var IE = Extractor{
 		urlPattern: `(?:www\.)?(?:youtube\.com|youtu.be)`,
-		apiURL:     "https://api.soundcloud.com/",
-		baseURL:    "https://youtube.com/",
+		name:       "Youtube",
 	}
 	engine.AddExtractor(IE)
 }
@@ -31,14 +25,16 @@ func (ie Extractor) Name() string {
 	return ie.name
 }
 
-func (ie Extractor) Compatible(u url.URL) bool {
+func (ie Extractor) Compatible(u *url.URL) bool {
 	s := u.Hostname()
-	ok, _ := regexp.MatchString(IE.urlPattern, s)
+	ok, _ := regexp.MatchString(ie.urlPattern, s)
 	return ok
 }
 
-func (ie Extractor) Extract(u url.URL) (*parsers.ExtractorInfo, error) {
-	c := Client{Debug: false}
+var audioITags = []int{251, 250, 249, 172, 171, 328, 325, 258, 256, 141, 140, 139}
+
+func (ie Extractor) Extract(u *url.URL, debug bool, client *http.Client) (*parsers.ExtractorInfo, error) {
+	c := &Client{HTTPClient: client, Debug: debug}
 	video, err := c.GetVideo(u.String())
 	if err != nil {
 		return nil, err
@@ -46,10 +42,10 @@ func (ie Extractor) Extract(u url.URL) (*parsers.ExtractorInfo, error) {
 	formats := parsers.Formats{}
 
 	if len(video.Streams) < 1 {
-		return nil, parsers.ErrCantContinue{Reason: "No formats"}
+		return nil, parsers.ErrCantContinue("found no streams")
 	}
 
-	// add first available iTag for external usage
+	// add first available iTag for emergency usage
 	audioITags = append(audioITags, video.Streams[0].ItagNo)
 
 	for _, tag := range audioITags {
